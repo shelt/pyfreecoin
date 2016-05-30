@@ -1,0 +1,12 @@
+#!/usr/bin/env python
+
+from time import sleep
+import net
+network = net.Network()
+network.serve()
+
+try:
+    while True:
+        sleep(1)
+except:
+    network.shutdown()
