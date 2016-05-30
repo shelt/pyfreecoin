@@ -1,19 +1,18 @@
 #!/usr/bin/env python
-
 import atexit
 import socketserver
 import threading
 
-import logger
+from freecoin import logger
 
 MAX_MSG_SIZE = 1024*1024
-PORT = 64720 # hex:fcd0
+PORT         = 64720 # hex:fcd0
 PROTOCOL_VERSION = 2
 
 # P2P network connection
 class Network():
     def __init__(self):
-        self.server = Server(self, ("localhost",PORT), ServerHandler)
+        self.server = _Server(self, ("localhost",PORT), _ServerHandler)
         self.peers = []
         atexit.register(self.shutdown)
 
@@ -35,14 +34,14 @@ class Network():
         peers.append(peer)
 
 # Server handler
-class ServerHandler(socketserver.BaseRequestHandler):
+class _ServerHandler(socketserver.BaseRequestHandler):
     def handle(self):
         peer = Peer(self.request, self.client_address[0], 0)
         self.server.network.peers.append(peer)
         peer.handle()
 
 # Server
-class Server(socketserver.ThreadingMixIn, socketserver.TCPServer):
+class _Server(socketserver.ThreadingMixIn, socketserver.TCPServer):
     def __init__(self, network, inet_addr, handler):
         super().__init__(inet_addr, handler)
         self.network = network

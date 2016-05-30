@@ -15,7 +15,7 @@ sock.sendall(b'\xde\xad\xbe\xef')
 while True:
     data = sock.recv(1024)
     if data == b"":
+        print("Disconnected")
         break
     else:
         print(data)
-
