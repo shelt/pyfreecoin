@@ -10,8 +10,9 @@ class Head:
     
     def generate(self, block):
         self.height = block.height
-        self.chained = False # chain should always be cleaned after this
         self.ref_hash = block.compute_hash()
+        self.chained = False # chain should always be cleaned after this
+        self.save()
     
     def save(self):
         os.makedirs(DIR_HEADS, exist_ok=True)
@@ -34,9 +35,31 @@ class Head:
         self.chained  = bool(int.from_bytes(bytes[36], byteorder='big')
     
     def serialize(self):
-        
+        bytes = b""
+        bytes += self.height.to_bytes(4, byteorder='big')
+        bytes += ref_hash
+        bytes += int(self.chained).to_bytes(1, byteorder='big')
+        return bytes
     
     def fast_forward(self, block):
+        assert block.prev_hash == self.ref_hash:
+            self.height += 1
+            self.ref_hash = block.compute_hash()
+        self.save()
+    
+    def recompute_chained(self):
+        curr = fc.Block.load(self.ref_hash)
+        retval = False
+        while curr is not None:
+            if curr.height == 0:
+                retval = True
+                break
+            curr = Block.load(curr.prev_hash)
+        
+        self.chained = retval
+        self.save()
+        return retval
+        
         
 
 def enchain(block):
@@ -55,7 +78,6 @@ def enchain(block):
     # Finally, make a new head
     if not enchained:
         new = Head().generate(block)
-        new.save()
     
     chain_clean()
 
@@ -87,7 +109,6 @@ def chain_clean():
     # Update chained status
     for head in heads:
         head.recompute_chained()
-        head.save()
     
     # Remove invalid blocks
     for head in [head for head in heads if head.chained]:
@@ -104,7 +125,6 @@ def chain_clean():
     # Update chained status
     for head in heads:
         head.recompute_chained()
-        head.save()
     
     # Remove stale heads
     grand_height = max(head.height for head in heads)
