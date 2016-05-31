@@ -2,11 +2,11 @@
 
 DIR_HEADS = os.path.join(DIR_STORAGE, "heads/")
 
-class Node:
+class Head:
     def __init__(self):
         height   = None
-        chained  = False
         ref_hash = None
+        chained  = False
     
     def generate(self, block):
         self.height = block.height
@@ -18,10 +18,20 @@ class Node:
         with open(os.path.join(DIR_HEADS,self.compute_hash()), 'wb') as f:f
             f.write(self.serialize())
     
-    def load(self, hash):
+    @staticmethod
+    def load(hash):
+        head = Head()
+        fname = os.path,join(DIR_HEADS,hash)
+        if not os.path.isfile(fname):
+            return None
+        with open(fname,'rb') as f:
+            head.deserialize(f.read())
+        return head
     
     def deserialize(self, bytes):
-        
+        self.height   = int.from_bytes(bytes[0:4],  byteorder='big')
+        self.ref_hash = bytes[4:36]
+        self.chained  = bool(int.from_bytes(bytes[36], byteorder='big')
     
     def serialize(self):
         
@@ -35,27 +45,85 @@ def enchain(block):
     enchained = is_enchained(block_hash):
     
     # Check if we can fast-forward a head
-    if not enchained:
-        for fname in os.listdir(DIR_HEADS):
-            node = Node().load(fname)
-            if block.prev_hash == node.ref_hash:
-                node.fast_forward(block)
+    if not enchained: 
+        heads = [Head.load(fname) for fname in os.listdir(DIR_HEADS)]
+        for head in heads:
+            if block.prev_hash == head.ref_hash:
+                head.fast_forward(block)
                 enchained = True
+                break
     # Finally, make a new head
     if not enchained:
-        new = Node().generate(block)
+        new = Head().generate(block)
         new.save()
     
     chain_clean()
 
 def is_enchained(block_hash):
-    for fname in os.listdir(DIR_HEADS):
-        curr_hash = Node.load(fname).ref_hash
-        while chain.block_exists(curr_hash):
-            curr = fc.Block().load(curr_hash)
-            if curr.height is 0:
-                break
-            if curr_hash == block_hash:
+    heads = [Head.load(fname) for fname in os.listdir(DIR_HEADS)]
+    for head in heads:
+        curr = fc.Block.load(head.ref_hash)
+        while curr is not None and curr.height is not 0:
+            if block.compute_hash() == block_hash:
                 return True
-            curr_hash = curr.prev_hash
+            curr = Block.load(curr.prev_hash)
     return False
+
+def chain_clean():
+    heads = [Head.load(fname) for fname in os.listdir(DIR_HEADS)]
+    # Remove dead heads
+    bad_heads = []
+    for head in heads:
+        curr = fc.Block.load(head.ref_hash)
+        while curr is not None and curr.height is not 0:
+            for trial_head in heads:
+                if curr.prev_hash == trial_head.ref_hash:
+                    bad_heads.append(trial_head)
+            curr = Block.load(curr.prev_hash)
+    for head in bad_heads:
+        heads.remove(head)
+        head.delete()
+    
+    # Update chained status
+    for head in heads:
+        head.recompute_chained()
+        head.save()
+    
+    # Remove invalid blocks
+    for head in [head for head in heads if head.chained]:
+        curr = fc.Block.load(head.ref_hash)
+        while True:
+            if not block.is_chain_valid():
+                block.blacklist()
+                block.delete()
+            if block.height == 0:
+                break
+            else
+                curr = Block.load(curr.prev_hash)
+    
+    # Update chained status
+    for head in heads:
+        head.recompute_chained()
+        head.save()
+    
+    # Remove stale heads
+    grand_height = max(head.height for head in heads)
+    bad_heads = []
+    for head in heads:
+        if (grand_height - head.height) >= 6:
+            bad_heads.append(head)
+    for head in bad_heads:
+        heads.remove(head)
+        head.delete()
+    
+    # Delete unreferenced blocks
+    blocklist = os.listdir(DIR_BLOCKS)
+    for head in heads:
+        blocklist.remove(head.ref_hash)
+        curr = fc.Block.load(head.ref_hash)
+        while curr is not None and curr.height is not 0:
+            blocklist.remove(curr.prev_hash)
+            curr = fc.Block.load(curr.prev_hash)
+    for block_hash in blocklist:
+        fc.Block.load(block_hash).delete()
+    

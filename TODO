@@ -2,4 +2,4 @@
     * way to create heads from scratch, if for some reason heads become corrupt
     * txindex rebuilding
 
-* heads now only point to fully-chained tops
+* Routinely tell peers about our highest block

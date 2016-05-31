@@ -41,10 +41,15 @@ class Block:
             for tx in self.txs:
                 f.write(tx.serialize())
     
-    def load(self, hash):
-        with open(os.path,join(DIR_TXINDEX,hash),'rb') as f:
-            deserialize(f.read())
-        return self
+    @staticmethod
+    def load(hash):
+        block = Block()
+        fname = os.path,join(DIR_BLOCKS,hash)
+        if not os.path.isfile(fname):
+            return None
+        with open(fname,'rb') as f:
+            block.deserialize(f.read())
+        return block
         
     def deserialize(self, bytes):
         self.version     = int.from_bytes(bytes[0:2]  , byteorder='big')
