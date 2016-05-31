@@ -11,7 +11,7 @@ def b58_encode(num):
 	while (num >= base_count):	
 		mod = num % base_count
 		encode = alphabet[mod] + encode
-		num = num / base_count
+		num = int(num / base_count)
 
 	if (num):
 		encode = alphabet[num] + encode
