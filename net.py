@@ -3,11 +3,11 @@ import atexit
 import socketserver
 import threading
 
+from freecoin.util import _VERSION_
 from freecoin import logger
 
 MAX_MSG_SIZE = 1024*1024
 PORT         = 64720 # hex:fcd0
-PROTOCOL_VERSION = 2
 
 # P2P network connection
 class Network():
@@ -24,7 +24,6 @@ class Network():
             peer.sock.close()
         self.peers = []
         self.server.shutdown()
-        print("debug")
 
     def connect(self, addr, port):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -80,7 +79,7 @@ class Peer:
                     break
 
                 vers = int.from_bytes(data[2:4], byteorder='big')
-                if vers != PROTOCOL_VERSION:
+                if vers != _VERSION_:
                     self.send_reject(ERR_BAD_VERSION)
                     continue
 
@@ -107,9 +106,11 @@ class Peer:
         if len(data) < 33:
             self.send_reject(ERR_MESSAGE_MALFORMED, info="getblocks")
             return
+        # Parameters
         start = data[0:32]
         count = data[32]
-        #TODO
+        # Logic
+        
 
     def recv_mempool(self, data):
         pass

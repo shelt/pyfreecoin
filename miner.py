@@ -4,8 +4,8 @@ from freecoin import net
 
 
 class Miner:
-    def __init__(self):
+    def __init__(self, network):
+        self.network = network
     
-    
-    def mine(self, recip):
-        recip.
+    def mine(self, key):
+        
