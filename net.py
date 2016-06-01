@@ -9,6 +9,25 @@ from freecoin import logger
 MAX_MSG_SIZE = 1024*1024
 PORT         = 64720 # hex:fcd0
 
+CTYPE_REJECT    = 0
+CTYPE_GETBLOCKS = 1
+CTYPE_MEMPOOL   = 2
+CTYPE_INV       = 3
+CTYPE_GETDATA   = 4
+CTYPE_BLOCK     = 5
+CTYPE_TX        = 6
+CTYPE_PEER      = 7
+CTYPE_ALERT     = 8
+CTYPE_PING      = 9
+CTYPE_PONG      = 10
+
+DTYPE_BLOCK = 0
+DTYPE_TX    = 1
+DTYPE_PEERS = 2
+
+OTYPE_WARNUSER    = 0 # Display a warning to the user, visible at all times.
+OTYPE_FORCEUPDATE = 1 # Do not allow user to do anything until the client is updated.
+
 # P2P network connection
 class Network():
     def __init__(self):
@@ -137,4 +156,50 @@ class Peer:
         pass
 
     def recv_pong(self, data):
+        pass
+
+    # Send methods
+    
+    def send_reject(self, etype, info=""):
+        self.send(CTYPE_REJECT, etype.to_bytes(1, byteorder='big') + info.encode("ascii"))
+
+    def send_getblocks(self, block_hash, count):
+        self.send(CTYPE_GETBLOCKS, block_hash + count.to_bytes(1, byteorder='big'))
+
+    def send_mempool(self):
+        self.send(CTYPE_MEMPOOL, "")
+
+    def send_inv(self, dtype, ids):
+        self.send(CTYPE_INV, dtype.to_bytes(1, byteorder='big').join([id.encode("ascii") for id in ids]))
+
+    def send_getdata(self, dtype, ids):
+        self.send(CTYPE_GETDATA, dtype.to_bytes(1, byteorder='big').join([id.encode("ascii") for id in ids]))
+
+    def send_block(self, block):
+        bytes = block.serialize()
+        self.send(CTYPE_BLOCK, len(bytes).to_bytes(1, byteorder='big') + bytes)
+
+    def send_tx(self, tx):
+        bytes = tx.serialize()
+        self.send(CTYPE_TX, len(bytes).to_bytes(1, byteorder='big') + bytes)
+
+    def send_peer(self, peer):
+        bytes = peer.serialize()
+        self.send(CTYPE_PEER, len(bytes).to_bytes(1, byteorder='big') + bytes)
+
+    def send_alert(self, atype, otype, time, msg):
+        with open(os.path.join(DIR_STORAGE, "adminkey")) as f:
+            adminkey = ecdsa.SigningKey.generate().from_pem(f.read())
+        doc = atype.to_bytes(1, byteorder='big')  +
+              otype.to_bytes(1, byteorder='big')  + 
+              time().to_bytes(4, byteorder='big') + 
+              msg.encode("ascii")
+        self.send(CTYPE_ALERT, len(msg).to_bytes(1, byteorder='big') + adminkey.sign(doc) + doc)
+
+    def send_ping(self, data):
+        self.send(CTYPE_PING, "")
+        pass
+
+    def send_pong(self, data):
+        self.send(CTYPE_PONG, "")
         pass

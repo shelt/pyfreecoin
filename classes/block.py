@@ -18,20 +18,21 @@ class Block:
         self.tx_count    = None
         self.txs         = None
     
-    def generate_workblock(self, addr):
-        latest = fc.chain.load_highest_block()
-        
-        self.version     = _VERSION_
-        self.time        = time()
-        self.height      = latest.height + 1
-        self.prev_hash   = latest.compute_hash()
-        recompute_merkle_root()
-        self.target      = fc.chain.compute_next_target(latest)
-        self.nonce       = 0
-        self.tx_count    = 1
-        self.txs         = [fc.Tx().generate_coinbase(addr)]
-        return self
+    def generate_workblock(addr):
+        latest = fc.get_highest_chained_block()
+        block = Block()
+        block.version     = _VERSION_
+        block.time        = time()
+        block.height      = latest.height + 1
+        block.prev_hash   = latest.compute_hash()
+        block.recompute_merkle_root()
+        block.target      = fc.chain.compute_next_target(latest)
+        block.nonce       = 0
+        block.tx_count    = 1
+        block.txs         = [fc.Tx().generate_coinbase(addr)]
+        return block
     
+    # Only call on valid blocks!
     def save(self):
         os.makedirs(DIR_BLOCKS, exist_ok=True)
         with open(os.path.join(DIR_BLOCKS,self.compute_hash()), 'wb') as f:

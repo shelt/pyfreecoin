@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+import os
+from operator import attrgetter
 
 DIR_HEADS = os.path.join(DIR_STORAGE, "heads/")
 
@@ -79,7 +81,7 @@ def enchain(block):
     if not enchained:
         new = Head().generate(block)
     
-    chain_clean()
+    clean()
 
 def is_enchained(block_hash):
     heads = [Head.load(fname) for fname in os.listdir(DIR_HEADS)]
@@ -91,7 +93,7 @@ def is_enchained(block_hash):
             curr = Block.load(curr.prev_hash)
     return False
 
-def chain_clean():
+def clean():
     heads = [Head.load(fname) for fname in os.listdir(DIR_HEADS)]
     # Remove dead heads
     bad_heads = []
@@ -147,3 +149,9 @@ def chain_clean():
     for block_hash in blocklist:
         fc.Block.load(block_hash).delete()
     
+def get_highest_chained_block():
+    return Block.load(get_highest_chained_hash())
+
+def get_highest_chained_hash():
+    heads = [Head.load(fname) for fname in os.listdir(DIR_HEADS)]
+    return max(heads, key=attrgetter('height')).ref_hash
