@@ -119,20 +119,25 @@ class Peer:
             e_str = data[1:]
             print("reject receive: [%d] %s" % (e_type, e_str))
         else:
-            print("reject receive: [anonymous]")
+            print("reject receive: [untitled]")
 
     def recv_getblocks(self, data):
         if len(data) < 33:
             self.send_reject(ERR_MESSAGE_MALFORMED, info="getblocks")
             return
-        # Parameters
+        
         start = data[0:32]
         count = data[32]
-        # Logic
         
+        block = tc.Block.load(start)
+        i = 0
+        while block is not None and i<count:
+            self.send_block(block)
+            block = tc.Block.load(block.prev_hash)
+            i += 1
 
     def recv_mempool(self, data):
-        pass
+        self.network.mempool.
 
     def recv_inv(self, data):
         pass
