@@ -1,12 +1,12 @@
 #!/usr/bin/env python
+import os
+from binascii import hexlify
+from time import time
+from hashlib import sha256
 
 import freecoin as fc
-from freecoin.util import _VERSION_
 
-DIR_BLOCKS = os.path.join(DIR_STORAGE, "blocks/")
-DIR_TXINDEX = os.path.join(DIR_STORAGE, "txindex/")
-
-class Block:
+class Block(fc.classes.Hashable):
     def __init__(self):
         self.version     = None
         self.time        = None
@@ -20,10 +20,14 @@ class Block:
     
     @staticmethod
     def generate_workblock(addr):
-        latest = fc.get_highest_chained_block()
-        block = Block()
-        block.version     = _VERSION_
-        block.time        = time()
+        latest = fc.chain.get_highest_chained_block()
+        if latest is None:
+            fc.logger.error("Failed to generate workblock do to failure to retrieve highest chained block!")
+            return None
+        
+        block = fc.Block()
+        block.version     = fc._VERSION_
+        block.time        = int(time())
         block.height      = latest.height + 1
         block.prev_hash   = latest.compute_hash()
         block.target      = fc.chain.compute_next_target(latest)
@@ -33,21 +37,22 @@ class Block:
         block.recompute_merkle_root()
         return block
     
-    # Only call on valid blocks!
+    # Only call on pseudo-valid blocks!
     def to_file(self):
-        os.makedirs(DIR_BLOCKS, exist_ok=True)
-        with open(os.path.join(DIR_BLOCKS,self.compute_hash()), 'wb') as f:
+        os.makedirs(fc.DIR_BLOCKS, exist_ok=True)
+        with open(os.path.join(fc.DIR_BLOCKS,hexlify(self.compute_hash()).decode()), 'wb') as f:
             f.write(self.to_bytes())
-        os.makedirs(DIR_TXINDEX, exist_ok=True)
-        with open(os.path.join(DIR_TXINDEX,self.compute_hash()), 'wb') as f:
+        os.makedirs(fc.DIR_TXINDEX, exist_ok=True)
+        with open(os.path.join(fc.DIR_TXINDEX,hexlify(self.compute_hash()).decode()), 'wb') as f:
             for tx in self.txs:
                 f.write(tx.compute_hash())
     
     @staticmethod
     def from_file(hash):
-        fname = os.path,join(DIR_BLOCKS,hash)
-        if not os.path.isfile(fname):
-            return None
+        if type(hash) is str:
+            fname = os.path.join(fc.DIR_BLOCKS,hash)
+        else:
+            fname = os.path.join(fc.DIR_BLOCKS,hexlify(hash).decode())
         with open(fname,'rb') as f:
             return Block.from_bytes(f.read())
     
@@ -63,15 +68,12 @@ class Block:
         block.nonce       = int.from_bytes(bytes[76:80], byteorder='big')
         block.tx_count    = int.from_bytes(bytes[80:84], byteorder='big')
         
-        # WILDLY BROKEN TODO FIX
         block.txs = []
-        c = 84
-        for tx in block.txs:
-            tx = Tx.from_bytes(bytes[84:])
-            if tx is None:
-                return None
-            txs.append(tx)
-            c += tx.compute_size()
+        i = 84
+        for i in range(block.tx_count):
+            tx = fc.Tx.from_bytes(bytes[i:])
+            i += tx.compute_raw_size()
+        return block
     
     def to_bytes(self):
         bytes = b""
@@ -93,11 +95,11 @@ class Block:
         if self.height is 0:
             if self.compute_hash() == ONE_TRUE_ROOT:
                 return True
-            else
+            else:
                 return False
         elif height < 0:
             return False
-        else
+        else:
             prev = fc.Block.from_file(self.prev_hash)
             if prev is None:
                 return False
@@ -110,3 +112,10 @@ class Block:
         for tx in self.txs:
             if not tx.is_chain_valid():
                 return False
+        
+    def recompute_merkle_root(self):
+        leaves = [sha256(tx.to_bytes()).digest() for tx in self.txs]
+        while len(leaves) > 2:
+            branch = divide(leaves, 2)
+            leaves = [sha256(b"".join(limb)).digest() for limb in branch]
+        self.merkle_root = sha256(b"".join(leaves)).digest()
