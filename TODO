@@ -1,3 +1,12 @@
+* Validation for respective classes
+* Peer saving and startup procedure
+* blacklists
+* 
+
+
+* catch exceptions during deserialization and serialization and return none
+
+
 * Fix corrupt data / "rebuild"
     * way to create heads from scratch, if for some reason heads become corrupt
     * txindex rebuilding

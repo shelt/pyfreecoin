@@ -9,21 +9,22 @@ from freecoin import logger
 MAX_MSG_SIZE = 1024*1024
 PORT         = 64720 # hex:fcd0
 
-CTYPE_REJECT    = 0
-CTYPE_GETBLOCKS = 1
-CTYPE_MEMPOOL   = 2
-CTYPE_INV       = 3
-CTYPE_GETDATA   = 4
-CTYPE_BLOCK     = 5
-CTYPE_TX        = 6
-CTYPE_PEER      = 7
-CTYPE_ALERT     = 8
-CTYPE_PING      = 9
-CTYPE_PONG      = 10
+CTYPE_REJECT     = 0
+CTYPE_GETHIGHEST = 1
+CTYPE_GETCHAIN   = 2
+CTYPE_MEMPOOL    = 3
+CTYPE_INV        = 4
+CTYPE_GETDATA    = 5
+CTYPE_BLOCK      = 6
+CTYPE_TX         = 7
+CTYPE_PEER       = 8
+CTYPE_ALERT      = 9
+CTYPE_PING       = 10
+CTYPE_PONG       = 11
 
 DTYPE_BLOCK = 0
 DTYPE_TX    = 1
-DTYPE_PEERS = 2
+DTYPE_PEER  = 2
 
 OTYPE_WARNUSER    = 0 # Display a warning to the user, visible at all times.
 OTYPE_FORCEUPDATE = 1 # Do not allow user to do anything until the client is updated.
@@ -120,10 +121,13 @@ class Peer:
             print("reject receive: [%d] %s" % (e_type, e_str))
         else:
             print("reject receive: [untitled]")
+    
+    def recv_gethighest(self, data):
+        self.send_inv(DTYPE_BLOCK, [fc.chain.get_highest_chained_hash()])
 
-    def recv_getblocks(self, data):
+    def recv_getchain(self, data):
         if len(data) < 33:
-            self.send_reject(ERR_MESSAGE_MALFORMED, info="getblocks")
+            self.send_reject(ERR_MESSAGE_MALFORMED, info="getchain")
             return
         
         start = data[0:32]
@@ -137,31 +141,97 @@ class Peer:
             i += 1
 
     def recv_mempool(self, data):
-        self.network.mempool.
+        self.send_inv(DTYPE_TX, [tx.compute_hash() for tx in self.network.mempool.keys()])
 
     def recv_inv(self, data):
-        pass
+        dtype = data[0]
+        count = data[1]
+        hashl = data[2:]
+        if len(hashes) > 32*255:
+            return # TODO resp with error
+        if len(hashes) % 32 is not 0:
+            return # TODO resp with error
+        hashes = [hashl[i:i+32] for i in range(0, len(l), 32)]
+        
+        if dtype is DTYPE_BLOCK:
+            blacklisted = lambda h: fc.is_block_blacklisted(h)
+            dirname   = fc.DIR_BLOCKS
+        elif dtype is DTYPE_TX:
+            blacklisted = lambda h: False # TODO: Txs should not be blacklisted
+            dirname   = fc.DIR_TX
+        else:
+            return #TODO resp with error
+        
+            for hash in hashes:
+                if blacklisted(hash):
+                    continue
+                if hash not in os.listdir(dirname):
+                    needed.append(hash)
+        
+        self.send_getdata(dtype, needed)
+        
 
     def recv_getdata(self, data):
-        pass
-
+        dtype = data[0]
+        count = data[1]
+        hashl = data[2:]
+        
+        if dtype is DTYPE_PEER:
+            for peer in self.network.peers:
+                self.send_peer(peer)
+            return
+        
+        if len(hashes) > 32*255:
+            return # TODO resp with error
+        if len(hashes) % 32 is not 0:
+            return # TODO resp with error
+        hashes = [hashl[i:i+32] for i in range(0, len(l), 32)]
+        
+        if dtype is DTYPE_BLOCK:
+            for hash in hashes:
+                block = fc.Block.load(hash)
+                if block is not None:
+                    self.send_block(block)
+        elif dtype is DTYPE_TX:
+            for hash in hashes:
+                tx = fc.Tx.load(hash)
+                if tx is not None:
+                    self.send_tx(tx)
+        else:
+            return #TODO resp with error
+        
     def recv_block(self, data):
-        pass
+        block = Block.from_bytes(data)
+        if block is None:
+            return #TODO resp with error
+        if fc.is_block_blacklisted(block.compute_hash()):
+            return #TODO resp with error
+        if not block.is_pseudo_valid():
+            return #TODO resp with error
+        else
+            tc.chain.enchain(block)
 
     def recv_tx(self, data):
-        pass
+        tx = Tx.from_bytes(data)
+        if tx is None:
+            return #TODO resp with error
+        if not block.is_pseudo_valid():
+            return #TODO resp with error
+        hash = tx.compute_hash()
+        if hash not in self.network.mempool:
+            self.network.mempool[tx.compute_hash()] = tx
 
     def recv_peer(self, data):
-        pass
+        pass#TODO
 
     def recv_alert(self, data):
-        pass
+        pass#TODO
 
     def recv_ping(self, data):
-        pass
+        pass#TODO
 
     def recv_pong(self, data):
-        pass
+        pass#TODO
 
     # Send methods
     

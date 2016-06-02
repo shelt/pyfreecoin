@@ -16,6 +16,10 @@ class Miner:
             while not success:
                 if get_highest_chained_hash() != workblock.prev_hash:
                     break
+                for hash,tx in self.network.mempool.items():
+                    if tx not in workblock.txs and tx.is_chain_valid_wrt(workblock):
+                        workblock.txs.append(tx)
+                workblock.recompute_merkle_root()
                 period = time()
                 while True:
                     if time() - period >= 5:
