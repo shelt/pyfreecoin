@@ -1,7 +1,10 @@
+** NETWORK CONNECTING PROCEDURE
+** ADMIN FUNCTIONS LIKE BLOCKCHAIN INITTING
+** PEER SAVING
+
 * Validation for respective classes
-* Peer saving and startup procedure
 * blacklists
-* 
+
 
 
 * catch exceptions during deserialization and serialization and return none
