@@ -1,6 +1,5 @@
 import os
 
-if os.name is 'nt':
-    DIR_STORAGE = os.path.join(os.getenv('APPDATA'), "freecoin/")
-else:
-    DIR_STORAGE = os.path.join(os.getenv('HOME'), ".freecoin/")
+# Divide l into groups of g
+def divide(l, g):
+    return [l[i:i+g] for i in range(0, len(l), g)]

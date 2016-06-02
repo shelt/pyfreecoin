@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 
-def log(body):
-    msg("LOG", body)
+def info(body):
+    msg("INFO", body)
 
 def verbose(body):
-    msg("VER", body)
+    msg("VERB", body)
 
 def error(body):
-    msg("ERR", body)
+    msg("ERR ", body)
 
 def msg(prefix, body):
     if type(body) == list:
@@ -18,4 +18,4 @@ def msg(prefix, body):
         lines = [body]
 
     for line in lines:
-        print(prefix + " | " + line)
+        print(prefix + "> " + line)
