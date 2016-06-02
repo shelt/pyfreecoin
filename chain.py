@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 import os
 from operator import attrgetter
+from binascii import hexlify,unhexlify
 
-DIR_HEADS = os.path.join(DIR_STORAGE, "heads/")
+import freecoin as fc
 
-class Head:
+# TODO move to classes/
+class Head(fc.classes.Hashable):
     def __init__(self, block=None):
         height   = None
         ref_hash = None
@@ -19,37 +21,38 @@ class Head:
         self.to_file()
     
     def to_file(self):
-        os.makedirs(DIR_HEADS, exist_ok=True)
-        with open(os.path.join(DIR_HEADS,self.compute_hash()), 'wb') as f:f
+        os.makedirs(fc.DIR_HEADS, exist_ok=True)
+        with open(os.path.join(fc.DIR_HEADS,hexlify(self.compute_hash()).decode()), 'wb') as f:
             f.write(self.to_bytes())
     
     @staticmethod
     def from_file(hash):
-        fname = os.path,join(DIR_HEADS,hash)
-        if not os.path.isfile(fname):
-            return None
+        if type(hash) is str:
+            fname = os.path.join(fc.DIR_HEADS,hash)
+        else:
+            fname = os.path.join(fc.DIR_HEADS,hexlify(hash).decode())
         with open(fname,'rb') as f:
             return Head.from_bytes(f.read())
     
     @staticmethod
-    def from_bytes(self, bytes):
-	    tx = Tx()
-        tx.height   = int.from_bytes(bytes[0:4],  byteorder='big')
-        tx.ref_hash = bytes[4:36]
-        tx.chained  = bool(int.from_bytes(bytes[36], byteorder='big')
-        return tx
+    def from_bytes(bytes):
+        head = Head()
+        head.height   = int.from_bytes(bytes[0:4],  byteorder='big')
+        head.ref_hash = bytes[4:36]
+        head.chained  = bool(int.from_bytes(bytes[36:37], byteorder='big'))
+        return head
     
     def to_bytes(self):
         bytes = b""
         bytes += self.height.to_bytes(4, byteorder='big')
-        bytes += ref_hash
+        bytes += self.ref_hash
         bytes += int(self.chained).to_bytes(1, byteorder='big')
         return bytes
     
     def fast_forward(self, block):
-        assert block.prev_hash == self.ref_hash:
-            self.height += 1
-            self.ref_hash = block.compute_hash()
+        assert block.prev_hash == self.ref_hash
+        self.height += 1
+        self.ref_hash = block.compute_hash()
         self.to_file()
     
     def recompute_chained(self):
@@ -68,26 +71,27 @@ class Head:
         
 
 def enchain(block):
+    block.to_file()
     # Ensure the block isn't already enchained
-    block_hash = block.compute_hash()
-    enchained = is_enchained(block_hash):
+    if is_enchained(block.compute_hash()):
+        return
     
     # Check if we can fast-forward a head
-    if not enchained: 
-        heads = [Head.from_file(fname) for fname in os.listdir(DIR_HEADS)]
-        for head in heads:
-            if block.prev_hash == head.ref_hash:
-                head.fast_forward(block)
-                enchained = True
-                break
-    # Finally, make a new head
+    enchained = False
+    heads = [Head.from_file(fname) for fname in os.listdir(fc.DIR_HEADS)]
+    for head in heads:
+        if block.prev_hash == head.ref_hash:
+            head.fast_forward(block)
+            enchained = True
+            break
+    # If all else failed, make a new head
     if not enchained:
-        new = Head().generate(block)
+        new = Head().point_to(block)
     
     clean()
 
 def is_enchained(block_hash):
-    heads = [Head.from_file(fname) for fname in os.listdir(DIR_HEADS)]
+    heads = [Head.from_file(fname) for fname in os.listdir(fc.DIR_HEADS)]
     for head in heads:
         curr = fc.Block.from_file(head.ref_hash)
         while curr is not None and curr.height is not 0:
@@ -97,7 +101,7 @@ def is_enchained(block_hash):
     return False
 
 def clean():
-    heads = [Head.from_file(fname) for fname in os.listdir(DIR_HEADS)]
+    heads = [Head.from_file(fname) for fname in os.listdir(fc.DIR_HEADS)]
     # Remove dead heads
     bad_heads = []
     for head in heads:
@@ -124,7 +128,7 @@ def clean():
                 block.delete()
             if block.height == 0:
                 break
-            else
+            else:
                 curr = Block.from_file(curr.prev_hash)
     
     # Update chained status
@@ -142,7 +146,7 @@ def clean():
         head.delete()
     
     # Delete unreferenced blocks
-    blocklist = os.listdir(DIR_BLOCKS)
+    blocklist = [unhexlify(hash) for hash in os.listdir(fc.DIR_BLOCKS)]
     for head in heads:
         blocklist.remove(head.ref_hash)
         curr = fc.Block.from_file(head.ref_hash)
@@ -153,17 +157,35 @@ def clean():
         fc.Block.from_file(block_hash).delete()
     
 def get_highest_chained_block():
-    return Block.from_file(get_highest_chained_hash())
+    hash = get_highest_chained_hash()
+    if hash is None:
+        return None
+    else:
+        return fc.Block.from_file(hash)
 
 def get_highest_chained_hash():
-    heads = [Head.from_file(fname) for fname in os.listdir(DIR_HEADS)]
+    heads = [Head.from_file(fname) for fname in os.listdir(fc.DIR_HEADS)]
+    if len(heads) == 0:
+        fc.logger.error("Failed to retrieve the highest chain hash because no heads exist! Please call network.update()!")
+        return None
     return max(heads, key=attrgetter('height')).ref_hash
 
 def compute_next_target(block):
-    if self.height < CHAIN_RECALC_INTERVAL:
-        return self.target
-    elif (self.height % CHAIN_RECALC_INTERVAL) is 0:
-        historic = n_blocks_ago(block, CHAIN_RECALC_INTERVAL)
+    if block.height < fc.net.CHAIN_RECALC_INTERVAL or \
+       (block.height % fc.net.CHAIN_RECALC_INTERVAL) != 0:
+        return block.target
+    else:
+        historic = n_blocks_ago(block, fc.net.CHAIN_RECALC_INTERVAL)
+        
+        diff = block.time - historic.time
+        
+        # Upper bound (4x)
+        if (diff > SECONDS_IN_8_WEEKS):
+            diff = SECONDS_IN_8_WEEKS
+        elif (diff < SECONDS_IN_HALF_WEEK):
+            diff = SECONDS_IN_HALF_WEEK
+        
+        return num_to_target((diff * target_to_num(block.target)) / 2)
 
 def n_blocks_ago(block, n):
     curr = block
@@ -173,4 +195,11 @@ def n_blocks_ago(block, n):
         if curr is None:
             break
     return curr
-    while
+
+def target_to_num(t):
+    return t[0] << 8*t[1]
+
+def num_to_target(num):
+    b1 = int(num.bit_length()/8 - 1)
+    b0 = num >> 8*b1
+    return bytes([b0,b1])
