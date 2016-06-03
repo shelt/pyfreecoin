@@ -50,6 +50,7 @@ class Block(fc.classes.Serializable):
 
     def delete_file(self):
         os.remove(os.path.join(fc.DIR_BLOCKS,hexlify(self.compute_hash()).decode()))
+        os.remove(os.path.join(fc.DIR_TXINDEX,hexlify(self.compute_hash()).decode()))
     
     @staticmethod
     def from_file(hash):
