@@ -1,9 +1,10 @@
 import os
 
 _VERSION_ = 2
+MINING_REWARD = 100
 
 # Storage
-if os.name is 'nt':
+if os.name == 'nt':
     DIR_STORAGE = os.path.join(os.getenv('APPDATA'), "freecoin/")
 else:
     DIR_STORAGE = os.path.join(os.getenv('HOME'), ".freecoin/")
