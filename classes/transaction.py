@@ -3,21 +3,21 @@ import os
 from hashlib import sha256
 
 import freecoin as fc
+from freecoin.transactions import *
 
-SIZE_TX_HEADER = 10
-SIZE_TX_INPUT  = 130
-SIZE_TX_OUTPUT = 37
 
-class Tx(fc.classes.Hashable):
-    def __init__(self, lock_time=0, ins=[], outs=[]):
+class Tx(fc.classes.Serializable):
+    def __init__(self, lock_time=0):
         self.version   = fc._VERSION_
         self.lock_time = lock_time
-        self.ins       = ins
-        self.outs      = outs
+        self.ins       = []
+        self.outs      = []
     
     @staticmethod
     def generate_coinbase(addr, lock_time=0):
-        #todo
+        tx = Tx(lock_time=lock_time)
+        tx.outs.append(TxOutput.generate(addr, fc.MINING_REWARD))
+        return tx
         
         
     @staticmethod
@@ -49,7 +49,10 @@ class Tx(fc.classes.Hashable):
         out_count    = int.from_bytes(bytes[4:6]  , byteorder='big')
         tx.lock_time = int.from_bytes(bytes[6:10] , byteorder='big')
         ins_bytes  = bytes[10:10+SIZE_TX_INPUT*in_count]
-        outs_bytes = bytes[10+SIZE_TX_INPUT*in_count:SIZE_TX_OUTPUT*out_count]
+        outs_bytes = bytes[10+SIZE_TX_INPUT*in_count:10+SIZE_TX_INPUT*in_count+SIZE_TX_OUTPUT*out_count]
+        
+        tx.ins = []
+        tx.outs = []
         for in_bytes in fc.util.divide(ins_bytes, SIZE_TX_INPUT):
             tx.ins.append(TxInput.from_bytes(in_bytes))
         for out_bytes in fc.util.divide(outs_bytes, SIZE_TX_OUTPUT):
@@ -61,7 +64,7 @@ class Tx(fc.classes.Hashable):
         bytes +=  self.version.to_bytes(2, byteorder='big')
         bytes +=  len(self.ins).to_bytes(2, byteorder='big')
         bytes +=  len(self.outs).to_bytes(2, byteorder='big')
-        bytes +=     self.lock_time.to_bytes(4, byteorder='big')
+        bytes +=  self.lock_time.to_bytes(4, byteorder='big')
         
         for input in self.ins:
             bytes += input.to_bytes()
@@ -73,8 +76,35 @@ class Tx(fc.classes.Hashable):
     def compute_raw_size(self):
         return SIZE_TX_HEADER + (SIZE_TX_INPUT*len(self.ins)) + (SIZE_TX_OUTPUT*len(self.outs))
     
+    def compute_surplus(self):
+        return sum(fc.Tx.from_file(tx=i.ref_tx).outs[i.out_index].amount for i in self.ins) - sum(out.amount for out in self.outs)
+    
+    def is_pseudo_valid(self):
+        size = self.compute_size()
+        if size > TX_FEE_THRESHOLD:
+            if self.compute_surplus() < required_surplus(size):
+                return False
+        for input in self.ins:
+            if not input.is_pseudo_valid():
+                return False
+        return True
+    
     def is_chain_valid_wrt(self, block):
-        pass #TODO
+        if not self.is_pseudo_valid():
+            return False
+        #if len(block.txs) == 0 or self.compute_hash() not in [tx.compute_hash() for tx in block.txs]:
+        #    return False # DELETE: It doesn't have to be in it to be valid with respect to it.
+        if (len(self.ins) == 0): # Must be coinbase
+                    # Ensure it's the first tx in block
+            return (self.compute_hash() == block.txs[0].compute_hash()) and \
+                sum(out.amount for out in self.outs) <= (fc.MINING_REWARD + block.compute_surplus())
+        else:
+            if self.compute_surplus() < 0:
+                return False
+            for input in self.ins:
+                if not input.is_chain_valid_wrt(block):
+                    return False
+            return True
 
 class TxInput:
     def __init__(self):
@@ -87,7 +117,7 @@ class TxInput:
     def generate(index, ref_tx_hash, key):
         input = TxInput()
         input.out_index   = index
-        input.ref_tx_hash = ref_tx_hash
+        input.ref_tx = ref_tx_hash
         input.pubkey      = key.public.to_string()
         input.sig = key.secret.sign(Tx.from_file(tx=ref_tx_hash).txs[index].get_signable_hash())
         return input
@@ -108,6 +138,20 @@ class TxInput:
         bytes += self.pubkey
         bytes += self.sig
         return bytes
+    
+    def is_chain_valid_wrt(self, block):
+        if not is_enchained(block.compute_hash()):
+            raise fc.NotChainedException
+        ref_tx = Tx.from_file(tx=self.ref_tx)
+        if ref_tx is None or len(ref_tx.outs) < self.out_index+1:
+            return False
+        if fc.keys.compute_addr(self.pubkey) != ref_tx.outs[self.out_index].out_addr:
+            return False
+        if not ecdsa.VerifyingKey.from_string(self.pubkey).verify(signature=self.sig, data=ref_tx.get_signable_hash()):
+            return False
+        
+        return chain.is_spent(self.ref_tx, self.out_index, notincluding=self.compute_hash())
+        
 
 class TxOutput:
     def __init__(self):

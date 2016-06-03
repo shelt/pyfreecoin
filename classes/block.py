@@ -6,7 +6,7 @@ from hashlib import sha256
 
 import freecoin as fc
 
-class Block(fc.classes.Hashable):
+class Block(fc.classes.Serializable):
     def __init__(self):
         self.version     = None
         self.time        = None
@@ -41,20 +41,28 @@ class Block(fc.classes.Hashable):
     def to_file(self):
         os.makedirs(fc.DIR_BLOCKS, exist_ok=True)
         with open(os.path.join(fc.DIR_BLOCKS,hexlify(self.compute_hash()).decode()), 'wb') as f:
+            assert self.to_bytes() == fc.Block.from_bytes(self.to_bytes()).to_bytes()
             f.write(self.to_bytes())
         os.makedirs(fc.DIR_TXINDEX, exist_ok=True)
         with open(os.path.join(fc.DIR_TXINDEX,hexlify(self.compute_hash()).decode()), 'wb') as f:
             for tx in self.txs:
                 f.write(tx.compute_hash())
+
+    def delete_file(self):
+        os.remove(os.path.join(fc.DIR_BLOCKS,hexlify(self.compute_hash()).decode()))
     
     @staticmethod
     def from_file(hash):
-        if type(hash) is str:
-            fname = os.path.join(fc.DIR_BLOCKS,hash)
-        else:
-            fname = os.path.join(fc.DIR_BLOCKS,hexlify(hash).decode())
-        with open(fname,'rb') as f:
-            return Block.from_bytes(f.read())
+        if type(hash) is not str:
+            hash = hexlify(hash).decode()
+        fname = os.path.join(fc.DIR_BLOCKS,hash)
+        try:
+            with open(fname,'rb') as f:
+                bytes = f.read()
+                assert Block.from_bytes(bytes).to_bytes() == bytes
+                return Block.from_bytes(bytes)
+        except FileNotFoundError:
+            return None
     
     @staticmethod
     def from_bytes(bytes):
@@ -70,20 +78,24 @@ class Block(fc.classes.Hashable):
         
         block.txs = []
         i = 84
-        for i in range(block.tx_count):
+        for _k in range(block.tx_count):
             tx = fc.Tx.from_bytes(bytes[i:])
+            block.txs.append(tx)
             i += tx.compute_raw_size()
         return block
     
     def to_bytes(self):
+        assert(len(self.prev_hash) == 32)
+        assert(len(self.merkle_root) == 32)
+        assert(len(self.target) == 2)
         bytes = b""
-        bytes +=  self.version.to_bytes(2, byteorder='big')
-        bytes +=     self.time.to_bytes(4, byteorder='big')
-        bytes +=   self.height.to_bytes(4, byteorder='big')
-        bytes +=  self.prev_hash
-        bytes +=  self.merkle_root
-        bytes +=  self.target
-        bytes +=    self.nonce.to_bytes(4, byteorder='big')
+        bytes += self.version.to_bytes(2, byteorder='big')
+        bytes += self.time.to_bytes(4, byteorder='big')
+        bytes += self.height.to_bytes(4, byteorder='big')
+        bytes += self.prev_hash
+        bytes += self.merkle_root
+        bytes += self.target
+        bytes += self.nonce.to_bytes(4, byteorder='big')
         bytes += self.tx_count.to_bytes(4, byteorder='big')
         
         for tx in self.txs:
@@ -91,13 +103,19 @@ class Block(fc.classes.Hashable):
         
         return bytes
     
+    def compute_surplus(self):
+        return fc.MINING_REWARD + sum(tx.compute_surplus() for tx in self.txs)
+    
+    def is_pseudo_valid(self):
+        raise NotImplementedError
+    
     def is_chain_valid(self):
-        if self.height is 0:
-            if self.compute_hash() == ONE_TRUE_ROOT:
+        if self.height == 0:
+            if self.compute_hash() == fc.admin.ONE_TRUE_ROOT:
                 return True
             else:
                 return False
-        elif height < 0:
+        elif self.height < 0:
             return False
         else:
             prev = fc.Block.from_file(self.prev_hash)
@@ -107,11 +125,12 @@ class Block(fc.classes.Hashable):
                 return False
             if self.height != (prev.height + 1):
                 return False
-            if self.target() != fc.chain.compute_next_target(prev):
+            if self.target != fc.chain.compute_next_target(prev):
                 return False
         for tx in self.txs:
-            if not tx.is_chain_valid():
+            if not tx.is_chain_valid_wrt(self):
                 return False
+        return True
         
     def recompute_merkle_root(self):
         leaves = [sha256(tx.to_bytes()).digest() for tx in self.txs]
