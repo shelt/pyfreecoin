@@ -6,24 +6,29 @@ from binascii import hexlify,unhexlify
 import freecoin as fc
 
 # TODO move to classes/
-class Head(fc.classes.Hashable):
-    def __init__(self, block=None):
+class Head(fc.classes.Serializable):
+    def __init__(self):
         height   = None
         ref_hash = None
-        chained  = False
-        if block:
-            self.point_to(block)
+        chained  = None
     
-    def point_to(self, block):
-        self.height = block.height
-        self.ref_hash = block.compute_hash()
-        self.chained = False # chain should always be cleaned after this
-        self.to_file()
+    @staticmethod
+    def point(block):
+        fc.logger.verbose("Creating new head at [%s]" % hexlify(block.compute_hash()).decode())
+        head = Head()
+        head.height = block.height
+        head.ref_hash = block.compute_hash()
+        head.chained = False # chain should always be cleaned after this
+        head.to_file()
+        return head
     
     def to_file(self):
         os.makedirs(fc.DIR_HEADS, exist_ok=True)
-        with open(os.path.join(fc.DIR_HEADS,hexlify(self.compute_hash()).decode()), 'wb') as f:
+        with open(os.path.join(fc.DIR_HEADS,hexlify(self.ref_hash).decode()), 'wb') as f:
             f.write(self.to_bytes())
+
+    def delete_file(self):
+        os.remove(os.path.join(fc.DIR_HEADS,hexlify(self.ref_hash).decode()))
     
     @staticmethod
     def from_file(hash):
@@ -31,8 +36,11 @@ class Head(fc.classes.Hashable):
             fname = os.path.join(fc.DIR_HEADS,hash)
         else:
             fname = os.path.join(fc.DIR_HEADS,hexlify(hash).decode())
-        with open(fname,'rb') as f:
-            return Head.from_bytes(f.read())
+        try:
+            with open(fname,'rb') as f:
+                return Head.from_bytes(f.read())
+        except FileNotFoundError:
+            return None
     
     @staticmethod
     def from_bytes(bytes):
@@ -50,10 +58,14 @@ class Head(fc.classes.Hashable):
         return bytes
     
     def fast_forward(self, block):
+        self.delete_file()
+        fc.logger.verbose("Fast forwarding head [%s]->[%s]" %
+            (hexlify(self.ref_hash).decode(), hexlify(block.compute_hash()).decode()))
         assert block.prev_hash == self.ref_hash
         self.height += 1
         self.ref_hash = block.compute_hash()
         self.to_file()
+
     
     def recompute_chained(self):
         curr = fc.Block.from_file(self.ref_hash)
@@ -62,14 +74,14 @@ class Head(fc.classes.Hashable):
             if curr.height == 0:
                 retval = True
                 break
-            curr = Block.from_file(curr.prev_hash)
+            curr = fc.Block.from_file(curr.prev_hash)
         
         self.chained = retval
         self.to_file()
         return retval
         
         
-
+#todo make method
 def enchain(block):
     block.to_file()
     # Ensure the block isn't already enchained
@@ -86,7 +98,7 @@ def enchain(block):
             break
     # If all else failed, make a new head
     if not enchained:
-        new = Head().point_to(block)
+        new = Head.point(block)
     
     clean()
 
@@ -94,10 +106,10 @@ def is_enchained(block_hash):
     heads = [Head.from_file(fname) for fname in os.listdir(fc.DIR_HEADS)]
     for head in heads:
         curr = fc.Block.from_file(head.ref_hash)
-        while curr is not None and curr.height is not 0:
-            if block.compute_hash() == block_hash:
+        while curr is not None and curr.height != 0:
+            if curr.compute_hash() == block_hash:
                 return True
-            curr = Block.from_file(curr.prev_hash)
+            curr = fc.Block.from_file(curr.prev_hash)
     return False
 
 def clean():
@@ -106,55 +118,61 @@ def clean():
     bad_heads = []
     for head in heads:
         curr = fc.Block.from_file(head.ref_hash)
-        while curr is not None and curr.height is not 0:
+        while curr is not None and curr.height != 0:
             for trial_head in heads:
                 if curr.prev_hash == trial_head.ref_hash:
-                    bad_heads.append(trial_head)
-            curr = Block.from_file(curr.prev_hash)
-    for head in bad_heads:
-        heads.remove(head)
-        head.delete()
+                    fc.logger.verbose("Removing dead head [%s]" % hexlify(head.ref_hash).decode())
+                    trial_head.delete_file()
+            curr = fc.Block.from_file(curr.prev_hash)
     
+    heads = [Head.from_file(fname) for fname in os.listdir(fc.DIR_HEADS)]
     # Update chained status
     for head in heads:
         head.recompute_chained()
     
+    heads = [Head.from_file(fname) for fname in os.listdir(fc.DIR_HEADS)]
     # Remove invalid blocks
     for head in [head for head in heads if head.chained]:
         curr = fc.Block.from_file(head.ref_hash)
         while True:
-            if not block.is_chain_valid():
-                block.blacklist()
-                block.delete()
-            if block.height == 0:
+            if not curr.is_chain_valid():
+                #curr.blacklist() TODO
+                fc.logger.verbose("Removing invalid block [%s]" % hexlify(curr.compute_hash()).decode())
+                fc.logger.verbose("Rewinding head [%s]->[%s]" % (hexlify(head.ref_hash).decode(), hexlify(curr.prev_hash).decode()))
+                curr.delete_file() #TODO rewind method instead of just calling point()
+                head.delete_file()
+                Head.point(fc.Block.from_file(curr.prev_hash))
+            if curr.height == 0:
                 break
             else:
-                curr = Block.from_file(curr.prev_hash)
+                curr = fc.Block.from_file(curr.prev_hash)
     
+    heads = [Head.from_file(fname) for fname in os.listdir(fc.DIR_HEADS)]
     # Update chained status
     for head in heads:
         head.recompute_chained()
     
+    heads = [Head.from_file(fname) for fname in os.listdir(fc.DIR_HEADS)]
     # Remove stale heads
     grand_height = max(head.height for head in heads)
     bad_heads = []
     for head in heads:
         if (grand_height - head.height) >= 6:
-            bad_heads.append(head)
-    for head in bad_heads:
-        heads.remove(head)
-        head.delete()
+            fc.logger.verbose("Removing stale head [%s]" % hexlify(head.ref_hash).decode())
+            head.delete_file()
     
-    # Delete unreferenced blocks
+    heads = [Head.from_file(fname) for fname in os.listdir(fc.DIR_HEADS)]
     blocklist = [unhexlify(hash) for hash in os.listdir(fc.DIR_BLOCKS)]
+    # Delete unreferenced blocks
     for head in heads:
         blocklist.remove(head.ref_hash)
         curr = fc.Block.from_file(head.ref_hash)
-        while curr is not None and curr.height is not 0:
+        while curr is not None and curr.height != 0:
             blocklist.remove(curr.prev_hash)
             curr = fc.Block.from_file(curr.prev_hash)
     for block_hash in blocklist:
-        fc.Block.from_file(block_hash).delete()
+        fc.logger.verbose("Removing unreferenced block [%s]" % hexlify(block_hash).decode())
+        fc.Block.from_file(block_hash).delete_file()
     
 def get_highest_chained_block():
     hash = get_highest_chained_hash()
@@ -170,6 +188,7 @@ def get_highest_chained_hash():
         return None
     return max(heads, key=attrgetter('height')).ref_hash
 
+#todo make method
 def compute_next_target(block):
     if block.height < fc.net.CHAIN_RECALC_INTERVAL or \
        (block.height % fc.net.CHAIN_RECALC_INTERVAL) != 0:
@@ -190,7 +209,7 @@ def compute_next_target(block):
 def n_blocks_ago(block, n):
     curr = block
     dest = block.height - n
-    while curr.height is not dest:
+    while curr.height != dest:
         curr = Block.load(block.prev_hash)
         if curr is None:
             break
