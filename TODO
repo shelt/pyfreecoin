@@ -15,3 +15,11 @@
     * txindex rebuilding
 
 * Routinely tell peers about our highest block
+
+
+
+NOTE:
+never do this:
+    def func(somekwarg=[])
+"is" checks for refence equality! never do this:
+    if something is somenumber or is not someothernumber:
