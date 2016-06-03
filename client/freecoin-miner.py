@@ -3,7 +3,7 @@ import freecoin
 
 if __name__ == "__main__":
     freecoin.init()
-    if len(sys.argv) is not 2:
+    if len(sys.argv) != 2:
         sys.exit("Usage: %s <address>" % sys.argv[0])
 
     net = freecoin.Network()

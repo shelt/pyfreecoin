@@ -10,6 +10,7 @@ class Network():
     def __init__(self):
         self.server = _Server(self, ("localhost",PORT), _ServerHandler)
         self.peers = []
+        self.mempool = {}
         atexit.register(self.shutdown)
 
     def serve(self):
@@ -127,14 +128,14 @@ class Peer:
         hashl = data[2:]
         if len(hashl) > 32*255:
             return # TODO resp with error
-        if len(hashl) % 32 is not 0:
+        if len(hashl) % 32 != 0:
             return # TODO resp with error
         hashes = fc.util.divide(hashl, 32)
         
-        if dtype is DTYPE_BLOCK:
+        if dtype == DTYPE_BLOCK:
             blacklisted = lambda h: fc.is_block_blacklisted(h)
             dirname   = fc.DIR_BLOCKS
-        elif dtype is DTYPE_TX:
+        elif dtype == DTYPE_TX:
             blacklisted = lambda h: False # TODO: Txs should not be blacklisted
             dirname   = fc.DIR_TX
         else:
@@ -154,23 +155,23 @@ class Peer:
         count = data[1]
         hashl = data[2:]
         
-        if dtype is DTYPE_PEER:
+        if dtype == DTYPE_PEER:
             for peer in self.network.peers:
                 self.send_peer(peer)
             return
         
         if len(hashes) > 32*255:
             return # TODO resp with error
-        if len(hashes) % 32 is not 0:
+        if (len(hashes) % 32) != 0:
             return # TODO resp with error
         hashes = fc.util.divide(hashl,32)
         
-        if dtype is DTYPE_BLOCK:
+        if dtype == DTYPE_BLOCK:
             for hash in hashes:
                 block = fc.Block.load(hash)
                 if block is not None:
                     self.send_block(block)
-        elif dtype is DTYPE_TX:
+        elif dtype == DTYPE_TX:
             for hash in hashes:
                 tx = fc.Tx.load(hash)
                 if tx is not None:
