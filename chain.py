@@ -216,9 +216,11 @@ def n_blocks_ago(block, n):
     return curr
 
 def target_to_num(t):
-    return t[0] << 8*t[1]
+    return (t[0] << (8*(t[3]+2))) | (t[1] << (8*(t[3]+1))) | (t[2] << (8*t[3]))
 
 def num_to_target(num):
-    b1 = int(num.bit_length()/8 - 1)
-    b0 = num >> 8*b1
-    return bytes([b0,b1])
+    blen = math.ceil(num.bit_length()/8)
+    b0 = num >> 8*(blen-1)
+    b1 = num >> 8*(blen-2) & 0xff
+    b2 = num >> 8*(blen-3) & 0xff
+    return bytes([b0,b1,b2,blen-2])

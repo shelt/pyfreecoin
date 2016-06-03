@@ -72,12 +72,12 @@ class Block(fc.classes.Serializable):
         block.height      = int.from_bytes(bytes[6:10] , byteorder='big')
         block.prev_hash   = bytes[10:42]
         block.merkle_root = bytes[42:74]
-        block.target      = bytes[74:76]
-        block.nonce       = int.from_bytes(bytes[76:80], byteorder='big')
-        block.tx_count    = int.from_bytes(bytes[80:84], byteorder='big')
+        block.target      = bytes[74:78]
+        block.nonce       = int.from_bytes(bytes[78:82], byteorder='big')
+        block.tx_count    = int.from_bytes(bytes[82:86], byteorder='big')
         
         block.txs = []
-        i = 84
+        i = 86
         for _k in range(block.tx_count):
             tx = fc.Tx.from_bytes(bytes[i:])
             block.txs.append(tx)
@@ -87,7 +87,7 @@ class Block(fc.classes.Serializable):
     def to_bytes(self):
         assert(len(self.prev_hash) == 32)
         assert(len(self.merkle_root) == 32)
-        assert(len(self.target) == 2)
+        assert(len(self.target) == 4)
         bytes = b""
         bytes += self.version.to_bytes(2, byteorder='big')
         bytes += self.time.to_bytes(4, byteorder='big')
