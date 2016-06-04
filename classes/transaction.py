@@ -92,8 +92,6 @@ class Tx(fc.classes.Serializable):
     def is_chain_valid_wrt(self, block):
         if not self.is_pseudo_valid():
             return False
-        #if len(block.txs) == 0 or self.compute_hash() not in [tx.compute_hash() for tx in block.txs]:
-        #    return False # DELETE: It doesn't have to be in it to be valid with respect to it.
         if (len(self.ins) == 0): # Must be coinbase
                     # Ensure it's the first tx in block
             return (self.compute_hash() == block.txs[0].compute_hash()) and \
@@ -150,8 +148,21 @@ class TxInput:
         if not ecdsa.VerifyingKey.from_string(self.pubkey).verify(signature=self.sig, data=ref_tx.get_signable_hash()):
             return False
         
-        return chain.is_spent(self.ref_tx, self.out_index, notincluding=self.compute_hash())
-        
+        return self.is_spent_wrt(block, self.ref_tx, self.out_index, notincluding=self.compute_hash())
+    
+    def is_spent_wrt(self, block, notincluding=None):
+        if not is_enchained(block.compute_hash()):
+            raise fc.NotChainedException
+        curr = block
+        while curr.height != 0:
+            for tx in curr.txs:
+                for input in tx.ins:
+                    if input.ref_tx == self.ref_tx and input.out_index == self.out_index:
+                        if not tx.compute_hash() == self.compute_hash():
+                            return True
+            
+            curr = fc.Block.from_file(curr.prev_hash)
+        return False
 
 class TxOutput:
     def __init__(self):

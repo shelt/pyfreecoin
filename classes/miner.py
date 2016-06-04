@@ -12,6 +12,7 @@ class Miner:
     
     def slow_mine(self, addr):
         while True:
+            fc.logger.verbose("Miner: starting new workblock")
             workblock = fc.Block.generate_workblock(addr)
             target_num = fc.chain.target_to_num(workblock.target)
             success = False
@@ -32,6 +33,6 @@ class Miner:
                         fc.logger.info("Block found! [%s]" % hexlify(hash).decode())
                         fc.chain.enchain(workblock)
                         for peer in self.network.peers:
-                            peer.send_inv([hash])
+                            peer.send_inv(fc.net.DTYPE_BLOCK,[hash])
                         success = True
                         break

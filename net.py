@@ -25,3 +25,8 @@ DTYPE_PEER  = 2
 OTYPE_WARNUSER    = 0 # Display a warning to the user, visible at all times.
 OTYPE_FORCEUPDATE = 1 # Do not allow user to do anything until the client is updated.
 
+ERR_BAD_VERSION = 1
+ERR_BAD_CTYPE = 2
+ERR_BAD_DTYPE = 3
+ERR_BAD_OTYPE = 4
+ERR_MESSAGE_MALFORMED = 5

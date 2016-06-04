@@ -6,6 +6,9 @@ def info(*args):
 def verbose(*args):
     msg("VERB", args)
 
+def warn(*args):
+    msg("WARN", args)
+
 def error(*args):
     msg("ERR ", args)
 

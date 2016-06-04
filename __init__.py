@@ -12,6 +12,7 @@ DIR_BLOCKS      = os.path.join(DIR_STORAGE, "blocks/")
 DIR_TXINDEX     = os.path.join(DIR_STORAGE, "txindex/")
 DIR_KEYS        = os.path.join(DIR_STORAGE, "private/")
 DIR_HEADS       = os.path.join(DIR_STORAGE, "heads/")
+FILE_KNOWNPEERS = os.path.join(DIR_STORAGE, "known_peers")
 
 # Classes
 from freecoin.classes.block       import Block
@@ -35,3 +36,7 @@ import freecoin.admin
 def init():
     for dir in [DIR_STORAGE, DIR_BLOCKS, DIR_TXINDEX, DIR_KEYS, DIR_HEADS]:
         os.makedirs(dir, exist_ok=True)
+    for file in [FILE_KNOWNPEERS]:
+        if not os.path.isfile(file):
+            with open(file, 'w') as f:
+                pass

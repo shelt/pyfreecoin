@@ -136,6 +136,6 @@ class Block(fc.classes.Serializable):
     def recompute_merkle_root(self):
         leaves = [sha256(tx.to_bytes()).digest() for tx in self.txs]
         while len(leaves) > 2:
-            branch = divide(leaves, 2)
+            branch = fc.util.divide(leaves, 2)
             leaves = [sha256(b"".join(limb)).digest() for limb in branch]
         self.merkle_root = sha256(b"".join(leaves)).digest()
