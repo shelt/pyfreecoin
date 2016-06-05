@@ -4,6 +4,10 @@
 * Validation for respective classes
 * blacklists
 
+* all from_file should return none if bytes return none
+* all from_file should be thread-safe
+
+after block additions during mining, remove all enchained txs from the mempool
 
 
 * catch exceptions during deserialization and serialization and return none

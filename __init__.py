@@ -15,6 +15,7 @@ DIR_HEADS       = os.path.join(DIR_STORAGE, "heads/")
 FILE_KNOWNPEERS = os.path.join(DIR_STORAGE, "known_peers")
 
 # Classes
+import freecoin.classes
 from freecoin.classes.block       import Block
 from freecoin.classes.transaction import Tx
 from freecoin.classes.transaction import TxInput

@@ -56,6 +56,8 @@ class Block(fc.classes.Serializable):
     def from_file(hash):
         if type(hash) is not str:
             hash = hexlify(hash).decode()
+        if not hash.isalnum():
+            return None
         fname = os.path.join(fc.DIR_BLOCKS,hash)
         try:
             with open(fname,'rb') as f:

@@ -24,6 +24,17 @@ class Tx(fc.classes.Serializable):
     def from_file(tx=None, block=None, index=None):
         # Only specify (tx) or (block and index)
         
+        if tx is not None:
+            if type(tx) is not str:
+                tx = hexlify(tx).decode()
+            if not tx.isalnum():
+                return None
+        if block is not None:
+            if type(block) is not str:
+                block = hexlify(block).decode()
+            if not block.isalnum():
+                return None
+        
         if (tx != None and (block == None and index == None)):
             # Get by transaction hash
             for fname in os.listdir(DIR_TXINDEX):

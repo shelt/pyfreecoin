@@ -23,6 +23,10 @@ class Key:
     
     @staticmethod
     def from_file(addr):
+        if type(addr) is not str:
+            addr = hexlify(addr).decode()
+        if not addr.isalnum():
+            return None
         secret = ec.SigningKey.generate()
         os.makedirs(fc.DIR_KEYS, exist_ok=True)
         try:

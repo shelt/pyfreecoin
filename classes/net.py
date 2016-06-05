@@ -11,54 +11,55 @@ from freecoin.net import *
 class Network():
     def __init__(self,port=PORT):
         self.server = _Server(self, ("localhost",port), _ServerHandler)
+        self.thread = None
         self.peers = []
         self.mempool = {}
         atexit.register(self.shutdown)
 
     def serve(self):
-        thread = threading.Thread(target=self.server.serve_forever)
-        thread.daemon = True
-        thread.start()
+        if self.thread is not None and self.thread.is_alive():
+            fc.logger.error("Attempted to start server which was already running")
+            return
+        self.thread = threading.Thread(target=self.server.serve_forever)
+        self.thread.daemon = True
+        self.thread.start()
         
         # Initial peer
         if len(self.peers) == 0:
-            with open(fc.FILE_KNOWNPEERS) as f:
-                known = [s.strip().split(":") for s in f.read().split("\n")]
-        for addr,port in known:
-            if self.connect(addr, int(port)):
-                return
+            known = Peer.from_file_all()
+            for peer_t in known:
+                peer = self.connect(*peer_t)
+                if peer is None:
+                    peer.delete_file()
 
     def shutdown(self):
         for peer in self.peers:
-            peer.sock.close()
+            peer.shutdown()
         self.peers = []
-        self.server.shutdown()
+        if self.thread is not None and self.thread.is_alive():
+            self.server.shutdown()
 
-    def connect(self, addr, port):
+    def connect(self, addr, port=PORT):
+        ### SERVER PEER CREATION ###
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.connect((addr,port)) #TODO try block and handle failure
-            peer = Peer(self, sock, addr, port)
-            thread = threading.Thread(target=peer.handle)
-            thread.daemon = True
-            thread.start()
-            self.peers.append(peer)
-            return True
-        except TimeoutError:
-            fc.logger.error("net: connecting timed out by %s:%d" % (addr,port))
-            sock.close()
-            return False
-        except ConnectionRefusedError:
-            fc.logger.error("net: connecting refused by %s:%d" % (addr,port))
-            sock.close()
-            return False
+            sock.connect((addr,port))
+        except socket.error:
+            fc.logger.error("net: failed to connect to server %s:%d" % (addr,port))
+            return None
+        peer = Peer(self, sock, addr, port)
+        thread = threading.Thread(target=peer.handle)
+        thread.daemon = True
+        thread.start()
+        self.peers.append(peer)
+        return peer
     
     def is_stable(self):
         return len(self.peers) >= 4
 
-# Server handler
 class _ServerHandler(socketserver.BaseRequestHandler):
     def handle(self):
+        ### CLIENT PEER CREATION ###
         peer = Peer(self.server.network, self.request, self.client_address[0], 0)
         self.server.network.peers.append(peer)
         peer.handle()
@@ -82,7 +83,7 @@ class Peer:
             0:self.recv_reject,
             1:self.recv_gethighest,
             2:self.recv_getchain,
-            3:self.recv_mempool,
+            3:self.recv_gettxs,
             4:self.recv_inv,
             5:self.recv_getdata,
             6:self.recv_block,
@@ -94,7 +95,22 @@ class Peer:
         }
 
     def shutdown(self):
+        try:
+            self.sock.shutdown(socket.SHUT_RDWR)
+        except socket.error:
+            pass
         self.sock.close()
+        if self in self.network.peers:
+            self.network.peers.remove(self)
+            
+    def to_file(self)
+        pass#TODO
+            
+            
+    @staticmethod
+    def from_file_list():
+        with open(fc.FILE_KNOWNPEERS) as f:
+            return [tuple(s.strip().split(":")) for s in f.read().split("\n")]
     
     def to_bytes(self):
         addr = self.addr.encode("ascii")
@@ -106,10 +122,13 @@ class Peer:
     
     @staticmethod
     def from_bytes(bytes):
-        port = int.from_bytes(bytes[:2], byteorder='big')
-        size = int.from_bytes(bytes[2:3], byteorder='big')
-        addr = bytes[3:3+size].decode("ascii")
-        return (addr,port)
+        try:
+            port = int.from_bytes(bytes[:2], byteorder='big')
+            size = int.from_bytes(bytes[2:3], byteorder='big')
+            addr = bytes[3:3+size].decode("ascii")
+            return (addr,port)
+        except:
+            return None
         
 
     def handle(self):
@@ -132,9 +151,9 @@ class Peer:
                     continue
                 else:
                     self.receivers[ctype](data[7:])
-        except ConnectionResetError as e:
+        except socket.error as e:
             self.shutdown()
-            fc.logger.error("Peer death: " + str(e))
+            fc.logger.error("net: Peer death during recv: " + str(e))
 
 
     def recv_reject(self, data):
@@ -147,7 +166,9 @@ class Peer:
     
     def recv_gethighest(self, data):
         fc.logger.verbose("net: recieve <gethighest>")
-        self.send_inv(DTYPE_BLOCK, [fc.chain.get_highest_chained_hash()])
+        highest = fc.chain.get_highest_chained_hash()
+        if highest is not None:
+            self.send_inv(DTYPE_BLOCK, [highest])
 
     def recv_getchain(self, data):
         fc.logger.verbose("net: recieve <getchain>")
@@ -165,8 +186,8 @@ class Peer:
             block = tc.Block.from_file(block.prev_hash)
             i += 1
 
-    def recv_mempool(self, data):
-        fc.logger.verbose("net: recieve <mempool>")
+    def recv_gettxs(self, data):
+        fc.logger.verbose("net: recieve <gettxs>")
         self.send_inv(DTYPE_TX, [tx.compute_hash() for tx in self.network.mempool.keys()])
 
     def recv_inv(self, data):
@@ -262,16 +283,28 @@ class Peer:
             self.network.mempool[tx.compute_hash()] = tx
 
     def recv_peer(self, data):
-        fc.logger.warn("Recieved <peer>, please implement functionality") #TODO
+        fc.logger.verbose("net: recieve <peer>")
+        peer_t = Peer.from_bytes(data)
+        if peer_t is None:
+            return
+        
+        if not self.network.is_stable():
+            peer = fc.network.connect(*peer_t)
+        if peer is not None:
+            peer.to_file()
+        else:
+            peer.delete_file() # Just in case
 
     def recv_alert(self, data):
-        fc.logger.warn("Recieved <alert>, please implement functionality") #TODO
+        fc.logger.error("net: recieve <peer> [doing nothing, please implement functionality]")
+        #TODO and change to verbose
 
     def recv_ping(self, data):
-        fc.logger.warn("Recieved <ping>, please implement functionality") #TODO
+        fc.logger.verbose("net: recieve <ping>")
+        self.send_pong()
 
     def recv_pong(self, data):
-        fc.logger.warn("Recieved <pong>, please implement functionality") #TODO
+        fc.logger.verbose("net: recieve <pong>")
 
     # Send methods
     
@@ -284,8 +317,8 @@ class Peer:
     def send_getchain(self, block_hash, count):
         self.send(CTYPE_GETCHAIN, block_hash + count.to_bytes(1, byteorder='big'))
 
-    def send_mempool(self):
-        self.send(CTYPE_MEMPOOL, b"")
+    def send_gettxs(self):
+        self.send(CTYPE_GETTXS, b"")
 
     def send_inv(self, dtype, ids):
         self.send(CTYPE_INV, dtype.to_bytes(1, byteorder='big') + len(ids).to_bytes(1, byteorder='big') + b"".join([id.encode("ascii") if type(id) is str else id for id in ids]))
@@ -314,11 +347,11 @@ class Peer:
               msg.encode("ascii")
         self.send(CTYPE_ALERT, len(msg).to_bytes(1, byteorder='big') + adminkey.sign(doc) + doc)
 
-    def send_ping(self, data):
+    def send_ping(self):
         self.send(CTYPE_PING, b"")
         pass
 
-    def send_pong(self, data):
+    def send_pong(self):
         self.send(CTYPE_PONG, b"")
         pass
 
@@ -328,4 +361,8 @@ class Peer:
         bytes += fc._VERSION_.to_bytes(2, byteorder='big')
         bytes += ctype.to_bytes(1, byteorder='big')
         bytes += body
-        self.sock.sendall(bytes)
+        try:
+            self.sock.sendall(bytes)
+        except socket.error as e:
+            self.shutdown()
+            fc.logger.error("net: Peer death during send: " + str(e))
