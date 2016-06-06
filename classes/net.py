@@ -399,7 +399,9 @@ class Peer:
         self.send(CTYPE_ALERT, len(msg).to_bytes(1, byteorder='big') + adminkey.sign(doc) + doc)
 
     def send_ping(self):
-        threading.Thread(target=self.send_magic_ping).start()
+        thread = threading.Thread(target=self.send_magic_ping)
+        thread.daemon = True
+        thread.start()
 
     # Threaded
     def send_magic_ping(self):
@@ -415,7 +417,6 @@ class Peer:
     
     def send_pong(self):
         self.send(CTYPE_PONG, b"")
-        print('todo')
     
 
     def send(self, ctype, body):

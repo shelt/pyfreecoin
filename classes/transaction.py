@@ -62,6 +62,11 @@ class Tx(fc.classes.Serializable):
         ins_bytes  = bytes[10:10+SIZE_TX_INPUT*in_count]
         outs_bytes = bytes[10+SIZE_TX_INPUT*in_count:10+SIZE_TX_INPUT*in_count+SIZE_TX_OUTPUT*out_count]
         
+        if in_count > 255:
+            return None
+        if out_count > 255:
+            return None
+        
         tx.ins = []
         tx.outs = []
         for in_bytes in fc.util.divide(ins_bytes, SIZE_TX_INPUT):

@@ -77,6 +77,9 @@ class Block(fc.classes.Serializable):
         block.nonce       = int.from_bytes(bytes[78:82], byteorder='big')
         tx_count = int.from_bytes(bytes[82:86], byteorder='big')
         
+        if tx_count > 255:
+            return None
+        
         block.txs = []
         i = 86
         for _k in range(tx_count):
