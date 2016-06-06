@@ -145,6 +145,7 @@ It's important to test the validity of data we receive. Although there are certa
 * The body's transactions must all be **chain-valid**.
 
 #### Transaction validation (pseudo)
+* `version` field matches that of the current client
 * If [transaction_size] > 1000 bytes, this transaction's outputs' combined output surplus must be >= [transaction_size] * `TX_FEE_PER_1K`
 * The body must contain `in_count` `tx_input`s and `out_count` `tx_outputs`. All inputs must be **pseudo-valid**.
 

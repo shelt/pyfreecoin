@@ -114,7 +114,7 @@ class Block(fc.classes.Serializable):
     def is_pseudo_valid(self):
         if int.from_bytes(self.compute_hash(), byteorder='big') > fc.chain.target_to_num(self.target):
             return False
-        if self.version != fc.__VERSION__:
+        if self.version != fc._VERSION_:
             return False
         if self.merkle_root != self._compute_merkle_root():
             return False

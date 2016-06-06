@@ -96,6 +96,8 @@ class Tx(fc.classes.Serializable):
         return sum(fc.Tx.from_file(tx=i.ref_tx).outs[i.out_index].amount for i in self.ins) - sum(out.amount for out in self.outs)
     
     def is_pseudo_valid(self):
+        if self.version != fc._VERSION_:
+            return False
         size = self.compute_size()
         if size > TX_FEE_THRESHOLD:
             if self.compute_surplus() < required_surplus(size):
