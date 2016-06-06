@@ -27,8 +27,8 @@ class Network():
         self.thread.start()
         
         # Custodians
-        chain_custodian()
-        peer_custodian()
+        self.chain_custodian()
+        self.peer_custodian()
         
         # Initial peer
         if len(self.peers) == 0:
@@ -65,7 +65,7 @@ class Network():
             for peer in self.peers:
                 peer.send_getdata(DTYPE_PEER, [])
         
-        thread = threading.Timer(120, peer_custodian)
+        thread = threading.Timer(120, self.peer_custodian)
         thread.daemon = True
         thread.start()
 

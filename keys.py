@@ -1,3 +1,5 @@
+import hashlib as hl
+from freecoin.util.hashlib import b58_encode
 
 def compute_address(pubkey_bytes):
     a = hl.sha256(pubkey_bytes).digest()

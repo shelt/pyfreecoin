@@ -5,7 +5,7 @@ import shutil
 import freecoin as fc
 
 # Hash of the only legitimate genesis block 
-ONE_TRUE_ROOT  = b'\x8eGj\x92j\xaa\xc7\xfd\x8e\xfbX\xb0\xe5\xf4{z\x89\x8c\xb5\tY\xce\x04\x1a\xee3DLT\r\x93\xdd'
+ONE_TRUE_ROOT  = b'\x00\x00\x00\x1b\xb2\x90\xcf;\xb2\x04G\x91]\xfa\xe8Ep\xfe\x97\xf2U\xed\x82fc\xc9\xa1t<J,\x07'
 # A hash of the verifying key of the admin_key
 ROOT_PREV_HASH = b"\x0b\x97|2\xd5\xfax\xfc\xde\x13\x11;\x19d\xa3\xb3{\xbfu\xe9\xac\xcb+\xb4V\xaa\x0c\xe8\xbfM\x83\xac"
 
@@ -24,7 +24,7 @@ def init_blockchain():
     block.height      = 0
     block.prev_hash   = ROOT_PREV_HASH
     block.target      = b"\xff\xff\xff\x1a"
-    block.nonce       = 0
+    block.nonce       = 34513722
     block.tx_count    = 1
     tx = fc.Tx(lock_time=0)
     tx.outs.append(fc.TxOutput.generate("2rF5NCyatob3WuuAqJ7od3oqwASU3jAjt", 1))

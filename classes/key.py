@@ -14,7 +14,7 @@ class Key:
         else:
             self.secret = ec.SigningKey.generate(curve=ec.SECP256k1)
         self.public = self.secret.get_verifying_key()
-        self.addr = compute_address(public.to_string())
+        self.addr = compute_address(self.public.to_string())
     
     def to_file(self):
         os.makedirs(fc.DIR_KEYS, exist_ok=True)
