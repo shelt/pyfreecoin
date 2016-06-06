@@ -184,7 +184,6 @@ def get_highest_chained_block():
 def get_highest_chained_hash():
     heads = [Head.from_file(fname) for fname in os.listdir(fc.DIR_HEADS)]
     if len(heads) == 0:
-        fc.logger.error("Failed to retrieve the highest chain hash because no heads exist! Please call network.update()!")
         return None
     return max(heads, key=attrgetter('height')).ref_hash
 

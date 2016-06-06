@@ -12,7 +12,7 @@ from freecoin.net import *
 # P2P network connection
 class Network():
     def __init__(self,port=PORT):
-        self.server = _Server(self, ("localhost",port), _ServerHandler)
+        self.server = _Server(self, ("",port), _ServerHandler)
         self.thread = None
         self.peers = []
         self.mempool = {}
@@ -49,7 +49,7 @@ class Network():
             sock.connect((addr,port))
             sock.settimeout(None)
         except socket.error as e:
-            fc.logger.error("net: failed to connect to server %s:%d" % (addr,port,e))
+            fc.logger.error("net: failed to connect to server %s:%d [%s]" % (addr,port,e))
             return None
         peer = Peer(self, sock, addr, port, is_server=True)
         thread = threading.Thread(target=peer.handle)
@@ -407,7 +407,7 @@ class Peer:
         for i in range(MAGIC_PING_RETRIES):
             if not self.send(CTYPE_PING, b""):
                 return
-            sleep(5)
+            sleep(MAGIC_PING_TIMEOUT)
             if self.pong_count > initial:
                 return
         fc.logger.verbose("net: peer unresponsive %s:%d" % (self.addr, self.port))
@@ -415,6 +415,7 @@ class Peer:
     
     def send_pong(self):
         self.send(CTYPE_PONG, b"")
+        print('todo')
     
 
     def send(self, ctype, body):
