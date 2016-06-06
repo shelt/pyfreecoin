@@ -379,15 +379,15 @@ class Peer:
 
     def send_block(self, block):
         bytes = block.to_bytes()
-        self.send(CTYPE_BLOCK, len(bytes).to_bytes(1, byteorder='big') + bytes)
+        self.send(CTYPE_BLOCK, bytes)
 
     def send_tx(self, tx):
         bytes = tx.to_bytes()
-        self.send(CTYPE_TX, len(bytes).to_bytes(1, byteorder='big') + bytes)
+        self.send(CTYPE_TX, bytes)
 
     def send_peer(self, peer):
         bytes = peer.to_bytes()
-        self.send(CTYPE_PEER, len(bytes).to_bytes(1, byteorder='big') + bytes)
+        self.send(CTYPE_PEER, bytes)
 
     def send_alert(self, atype, otype, time, msg):
         with open(os.path.join(DIR_STORAGE, "admin_secret")) as f:
