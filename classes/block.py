@@ -116,7 +116,7 @@ class Block(fc.classes.Serializable):
             return False
         if self.version != fc._VERSION_:
             return False
-        if self.merkle_root != self._compute_merkle_root():
+        if self.merkle_root != self.compute_merkle_root():
             return False
         for tx in self.txs:
             if not tx.is_pseudo_valid():
