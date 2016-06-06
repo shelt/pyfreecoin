@@ -311,9 +311,9 @@ class Peer:
             self.send_reject(ERR_MESSAGE_MALFORMED, "failed to parse block")
             return
         hash = block.compute_hash()
-        if fc.is_block_blacklisted(hash):
-            self.send_reject(ERR_BLOCK_BLACKLISTED, hexlify(hash).decode())
-            return
+        #if fc.is_block_blacklisted(hash):
+        #    self.send_reject(ERR_BLOCK_BLACKLISTED, hexlify(hash).decode())
+        #    return
         if not block.is_pseudo_valid():
             self.send_reject(ERR_BLOCK_INVALID, hexlify(hash).decode())
             return
