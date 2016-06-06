@@ -79,6 +79,17 @@ class Head(fc.classes.Serializable):
         self.chained = retval
         self.to_file()
         return retval
+    
+    def get_lowest_parent_hash(self):
+        last = curr
+        curr = fc.Block.from_file(self.ref_hash)
+        while curr is not None:
+            if curr.height == 0:
+                return None
+            last = curr
+            curr = fc.Block.from_file(curr.prev_hash)
+        
+        return last.ref_hash
         
         
 #todo make method

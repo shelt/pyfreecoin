@@ -41,13 +41,15 @@ class Network():
         if self.thread is not None and self.thread.is_alive():
             self.server.shutdown()
     
-    # Threaded TODO
-    def custodian(self):
+    def chain_custodian(self):
         # Try to finish incomplete chains
-        highest = fc.chain.get_highest_hash(chained_only=False)
-        if not fc.chain.is_enchained(highest):
+        highest = fc.chain.get_highest_head(chained_only=False)
+        if not highest.chained:
             for peer in self.peers:
-                peer.send_getchain(highest, 255)
+                peer.send_getchain(highest.get_lowest_parent_hash(), 255)
+        threading.Timer(5, chain_custodian).start()
+    
+    def peer_custodian(self):
         # Try to get latest chained block
         for peer in self.peers:
             peer.send_gethighest()
@@ -55,6 +57,7 @@ class Network():
         if len(self.peers) < 8:
             for peer in self.peers:
                 peer.send_getdata(DTYPE_PEER, [])
+        threading.Timer(120, peer_custodian).start()
 
     def connect(self, addr, port=PORT):
         ### SERVER PEER CREATION ###
@@ -334,11 +337,7 @@ class Peer:
             return
         else:
             fc.chain.enchain(block)
-            highest = fc.chain.get_highest_head(chained_only=False)
-            if highest is not None and not highest.chained:
-                for peer in self.network.peers:
-                    peer.send_getchain(highest.ref_hash, 255)
-
+        
     def recv_tx(self, data):
         fc.logger.verbose("net: recieve <tx>")
         tx = Tx.from_bytes(data)
