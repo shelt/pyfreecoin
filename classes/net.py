@@ -4,6 +4,8 @@ import socket
 import socketserver
 import threading
 from binascii import hexlify
+from time import sleep
+
 import freecoin as fc
 from freecoin.net import *
 
@@ -26,11 +28,11 @@ class Network():
         
         # Initial peer
         if len(self.peers) == 0:
-            known = Peer.from_file_all()
+            known = Peer.from_file_list()
             for peer_t in known:
                 peer = self.connect(*peer_t)
                 if peer is None:
-                    peer.delete_file()
+                    Peer.delete_file_static(*peer_t)
 
     def shutdown(self):
         for peer in self.peers:
@@ -47,7 +49,7 @@ class Network():
         except socket.error:
             fc.logger.error("net: failed to connect to server %s:%d" % (addr,port))
             return None
-        peer = Peer(self, sock, addr, port)
+        peer = Peer(self, sock, addr, port, is_server=True)
         thread = threading.Thread(target=peer.handle)
         thread.daemon = True
         thread.start()
@@ -60,7 +62,7 @@ class Network():
 class _ServerHandler(socketserver.BaseRequestHandler):
     def handle(self):
         ### CLIENT PEER CREATION ###
-        peer = Peer(self.server.network, self.request, self.client_address[0], 0)
+        peer = Peer(self.server.network, self.request, self.client_address[0], 0, is_server=False)
         self.server.network.peers.append(peer)
         peer.handle()
 
@@ -72,12 +74,14 @@ class _Server(socketserver.ThreadingMixIn, socketserver.TCPServer):
 
 # Peer
 class Peer:
-    def __init__(self, network, sock, addr, port):
+    def __init__(self, network, sock, addr, port, is_server):
         self.network = network
         self.sock = sock
         self.addr = addr
         self.port = port
-        self.queue = []
+        self.is_server = is_server
+        self.pong_count = 0
+        self.queue = [] #TODO
 
         self.receivers = {
             0:self.recv_reject,
@@ -103,14 +107,42 @@ class Peer:
         if self in self.network.peers:
             self.network.peers.remove(self)
             
-    def to_file(self)
-        pass#TODO
-            
+    def to_file(self):
+        to_file_static(self.addr,self.port)
+    
+    @staticmethod
+    def to_file_static(addr,port):
+        with open(fc.FILE_KNOWNPEERS,'r+') as f:
+            entry = addr + ":" + str(port)
+            known = [tuple(s.strip().split(":")) for s in f.read().split("\n")]
+            if not entry in known:
+                known.append(entry)
+                f.seek(0)
+                for peer_t in known:
+                    f.write(peer_t[0] + ":" + str(peer_t) + "\n")
+                f.truncate()
+    
+    def delete_file(self):
+        delete_file_static(self.addr,self.port)
+    
+    @staticmethod
+    def delete_file_static(addr,port):
+        entry = addr + ":" + str(port)
+        if entry=='localhost:64720': return # TESTING [TODO]
+        with open(fc.FILE_KNOWNPEERS,'r+') as f:
+            lines = [s.strip() for s in f.read().split("\n")]
+            if entry in lines:
+                lines.remove(entry)
+                f.seek(0)
+                for line in lines:
+                    f.write(line + "\n")
+                f.truncate()
             
     @staticmethod
     def from_file_list():
         with open(fc.FILE_KNOWNPEERS) as f:
-            return [tuple(s.strip().split(":")) for s in f.read().split("\n")]
+            peers_strs = [tuple(s.strip().split(":")) for s in f.read().split("\n")]
+            return [(e[0],int(e[1])) for e in peers_strs if len(e)==2 and e[0] != '']
     
     def to_bytes(self):
         addr = self.addr.encode("ascii")
@@ -133,7 +165,11 @@ class Peer:
 
     def handle(self):
         fc.logger.verbose("net: New peer: %s:%d" % (self.addr,self.port))
-        self.send_getdata(DTYPE_PEER, [])
+        self.send_ping()                      # Version exchange
+        if not self.network.is_stable:
+            self.send_getdata(DTYPE_PEER, []) # Peer exchange
+        self.send_gethighest()                # Block exchange
+        
         try:
             while True:
                 data = self.sock.recv(MAX_MSG_SIZE)
@@ -143,7 +179,7 @@ class Peer:
                 vers = int.from_bytes(data[4:6], byteorder='big')
                 if vers != fc._VERSION_:
                     self.send_reject(ERR_BAD_VERSION)
-                    continue
+                    break #TODO return needed?
 
                 ctype = int.from_bytes(data[6:7], byteorder='big')
                 if ctype not in self.receivers:
@@ -152,9 +188,9 @@ class Peer:
                 else:
                     self.receivers[ctype](data[7:])
         except socket.error as e:
-            self.shutdown()
-            fc.logger.error("net: Peer death during recv: " + str(e))
-
+            fc.logger.error("net: error during recv: " + str(e))
+        self.shutdown()
+        fc.logger.error("net: Peer lost (%s:%d)" % (self.addr, self.port))#TODO
 
     def recv_reject(self, data):
         if len(data) == 0:
@@ -173,7 +209,7 @@ class Peer:
     def recv_getchain(self, data):
         fc.logger.verbose("net: recieve <getchain>")
         if len(data) < 33:
-            self.send_reject(ERR_MESSAGE_MALFORMED, info="getchain too short")
+            self.send_reject(ERR_MESSAGE_MALFORMED, "getchain too short")
             return
         
         start = data[0:32]
@@ -193,15 +229,17 @@ class Peer:
     def recv_inv(self, data):
         fc.logger.verbose("net: recieve <inv>")
         if len(data) < 34:
-            self.send_reject(ERR_MESSAGE_MALFORMED, info="inv too short")
+            self.send_reject(ERR_MESSAGE_MALFORMED, "inv impossibly short")
             return
         dtype = data[0]
         count = data[1]
         hashl = data[2:]
         if len(hashl) > 32*255:
-            return # TODO resp with error
+            self.send_reject(ERR_MESSAGE_MALFORMED, "inv list too large")
+            return
         if len(hashl) % 32 != 0:
-            return # TODO resp with error
+            self.send_reject(ERR_MESSAGE_MALFORMED, "invalid inv list size")
+            return
         hashes = fc.util.divide(hashl, 32)
         
         if dtype == DTYPE_BLOCK:
@@ -211,7 +249,8 @@ class Peer:
             #blacklisted = lambda h: False # TODO: Txs should not be blacklisted
             dirname   = fc.DIR_TX
         else:
-            return #TODO resp with error
+            self.send_reject(ERR_BAD_DTYPE, "inv")
+            return
         
         needed = []
         for hash in hashes:
@@ -231,19 +270,22 @@ class Peer:
             return
         elif data[0] == DTYPE_PEER:
             for peer in self.network.peers:
-                self.send_peer(peer)
+                if peer.is_server and peer is not self:
+                    self.send_peer(peer)
             return
         elif len(data) < 34:
-            self.send_reject(ERR_MESSAGE_MALFORMED, info="getdata too short")
+            self.send_reject(ERR_MESSAGE_MALFORMED, info="getdata impossibly short")
             return
         dtype = data[0]
         count = data[1]
         hashl = data[2:]
         
         if len(hashl) > 32*255:
-            return # TODO resp with error
+            self.send_reject(ERR_MESSAGE_MALFORMED, "getdata list too large")
+            return
         if (len(hashl) % 32) != 0:
-            return # TODO resp with error
+            self.send_reject(ERR_MESSAGE_MALFORMED, "invalid getdata list size")
+            return
         hashes = fc.util.divide(hashl,32)
         
         if dtype == DTYPE_BLOCK:
@@ -257,17 +299,22 @@ class Peer:
                 if tx is not None:
                     self.send_tx(tx)
         else:
-            return #TODO resp with error
+            self.send_reject(ERR_BAD_DTYPE, "getdata")
+            return
         
     def recv_block(self, data):
         fc.logger.verbose("net: recieve <block>")
         block = fc.Block.from_bytes(data)
         if block is None:
-            return #TODO resp with error
-        if fc.is_block_blacklisted(block.compute_hash()):
-            return #TODO resp with error
+            self.send_reject(ERR_MESSAGE_MALFORMED, "failed to parse block")
+            return
+        hash = block.compute_hash()
+        if fc.is_block_blacklisted(hash):
+            self.send_reject(ERR_BLOCK_BLACKLISTED, hexlify(hash).decode())
+            return
         if not block.is_pseudo_valid():
-            return #TODO resp with error
+            self.send_reject(ERR_BLOCK_INVALID, hexlify(hash).decode())
+            return
         else:
             tc.chain.enchain(block)
 
@@ -275,29 +322,30 @@ class Peer:
         fc.logger.verbose("net: recieve <tx>")
         tx = Tx.from_bytes(data)
         if tx is None:
-            return #TODO resp with error
-        if not tx.is_pseudo_valid():
-            return #TODO resp with error
+            self.send_reject(ERR_MESSAGE_MALFORMED, "failed to parse transaction")
+            return
         hash = tx.compute_hash()
+        if not tx.is_pseudo_valid():
+            self.send_reject(ERR_TX_INVALID, hexlify(hash).decode())
+            return
         if hash not in self.network.mempool:
-            self.network.mempool[tx.compute_hash()] = tx
+            self.network.mempool[hash] = tx
 
     def recv_peer(self, data):
         fc.logger.verbose("net: recieve <peer>")
         peer_t = Peer.from_bytes(data)
         if peer_t is None:
             return
-        
         if not self.network.is_stable():
-            peer = fc.network.connect(*peer_t)
-        if peer is not None:
-            peer.to_file()
-        else:
-            peer.delete_file() # Just in case
+            peer = self.network.connect(*peer_t)
+            if peer is not None:
+                peer.to_file()
+            else:
+                Peer.delete_file_static(*peer_t) # Just in case
 
     def recv_alert(self, data):
         fc.logger.error("net: recieve <peer> [doing nothing, please implement functionality]")
-        #TODO and change to verbose
+        #TODO implement this and change to verbose
 
     def recv_ping(self, data):
         fc.logger.verbose("net: recieve <ping>")
@@ -305,6 +353,7 @@ class Peer:
 
     def recv_pong(self, data):
         fc.logger.verbose("net: recieve <pong>")
+        self.pong_count +=1
 
     # Send methods
     
@@ -348,12 +397,23 @@ class Peer:
         self.send(CTYPE_ALERT, len(msg).to_bytes(1, byteorder='big') + adminkey.sign(doc) + doc)
 
     def send_ping(self):
-        self.send(CTYPE_PING, b"")
-        pass
+        threading.Thread(target=self.send_magic_ping).start()
 
+    # Threaded
+    def send_magic_ping(self):
+        initial = self.pong_count
+        for i in range(MAGIC_PING_RETRIES):
+            if not self.send(CTYPE_PING, b""):
+                return
+            sleep(5)
+            if self.pong_count > initial:
+                return
+        fc.logger.verbose("net: peer unresponsive %s:%d" % (self.addr, self.port))
+        self.shutdown()
+    
     def send_pong(self):
         self.send(CTYPE_PONG, b"")
-        pass
+    
 
     def send(self, ctype, body):
         bytes = b""
@@ -363,6 +423,8 @@ class Peer:
         bytes += body
         try:
             self.sock.sendall(bytes)
+            return True
         except socket.error as e:
             self.shutdown()
             fc.logger.error("net: Peer death during send: " + str(e))
+            return False
