@@ -26,6 +26,10 @@ class Network():
         self.thread.daemon = True
         self.thread.start()
         
+        # Custodians
+        chain_custodian()
+        peer_custodian()
+        
         # Initial peer
         if len(self.peers) == 0:
             known = Peer.from_file_list()
@@ -47,7 +51,10 @@ class Network():
         if not highest.chained:
             for peer in self.peers:
                 peer.send_getchain(highest.get_lowest_parent_hash(), 255)
-        threading.Timer(5, chain_custodian).start()
+        
+        thread = threading.Timer(5, self.chain_custodian)
+        thread.daemon = True
+        thread.start()
     
     def peer_custodian(self):
         # Try to get latest chained block
@@ -57,7 +64,10 @@ class Network():
         if len(self.peers) < 8:
             for peer in self.peers:
                 peer.send_getdata(DTYPE_PEER, [])
-        threading.Timer(120, peer_custodian).start()
+        
+        thread = threading.Timer(120, peer_custodian)
+        thread.daemon = True
+        thread.start()
 
     def connect(self, addr, port=PORT):
         ### SERVER PEER CREATION ###
