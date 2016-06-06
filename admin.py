@@ -31,9 +31,15 @@ def init_blockchain():
     block.txs         = [tx]
     block.recompute_merkle_root()
     
+    target = fc.chain.target_to_num(block.target)
     hash = block.compute_hash()
-    if hash != ONE_TRUE_ROOT:
-        fc.logger.error("Please set ONE_TRUE_ROOT literal to the following before calling init_blockchain(): %s" % hash)
+    if int.from_bytes(hash, byteorder='big') > target or hash != ONE_TRUE_ROOT:
+        fc.logger.info("Genesis block is not configured. Please wait while a valid nonce is found...")
+        while int.from_bytes(block.compute_hash(), byteorder='big') > target:
+            block.nonce += 1
+        fc.logger.info("Found valid nonce. Please update the following source literals before continuing:")
+        fc.logger.info("Nonce        : %d" % block.nonce)
+        fc.logger.info("ONE_TRUE_ROOT: %s" % block.compute_hash())
         sys.exit()
-    
-    fc.chain.enchain(block)
+    else:
+        fc.chain.enchain(block)

@@ -22,7 +22,7 @@ class Miner:
                 for hash,tx in self.network.mempool.items():
                     if tx not in workblock.txs and tx.is_chain_valid_wrt(workblock):
                         workblock.txs.append(tx) #TODO if we receive txs with surpluses, increase our reward ie use block.calculate_surplus()
-                workblock.recompute_merkle_root()
+                workblock.recompute_merkle_root()#TODO update time
                 period = int(time())
                 while True:
                     if int(time()) - period >= 5:
