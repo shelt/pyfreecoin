@@ -334,10 +334,10 @@ class Peer:
             return
         else:
             fc.chain.enchain(block)
-            highest = fc.chain.get_highest_hash(chained_only=False)
-            if not fc.chain.is_enchained(highest):
+            highest = fc.chain.get_highest_head(chained_only=False)
+            if highest is not None and not highest.chained:
                 for peer in self.network.peers:
-                    peer.send_getchain(highest, 255)
+                    peer.send_getchain(highest.ref_hash, 255)
 
     def recv_tx(self, data):
         fc.logger.verbose("net: recieve <tx>")
