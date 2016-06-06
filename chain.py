@@ -154,12 +154,15 @@ def clean():
     
     heads = [Head.from_file(fname) for fname in os.listdir(fc.DIR_HEADS)]
     # Remove stale heads
-    grand_height = max(head.height for head in heads)
-    bad_heads = []
-    for head in heads:
-        if (grand_height - head.height) >= 6:
-            fc.logger.verbose("Removing stale head [%s]" % hexlify(head.ref_hash).decode())
-            head.delete_file()
+    
+    chained_heights = [head.height for head in heads if head.chained]
+    if len(chained_heights) > 0:
+        grand_height = max(chained_heights)
+        bad_heads = []
+        for head in heads:
+            if (grand_height - head.height) >= 6:
+                fc.logger.verbose("Removing stale head [%s]" % hexlify(head.ref_hash).decode())
+                head.delete_file()
     
     heads = [Head.from_file(fname) for fname in os.listdir(fc.DIR_HEADS)]
     blocklist = [unhexlify(hash) for hash in os.listdir(fc.DIR_BLOCKS)]
