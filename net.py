@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-MAX_MSG_SIZE = 1024*1024
+SIZE_HEADER = 7
 PORT         = 64720 # hex:fcd0
 
 CHAIN_RECALC_INTERVAL = 2016

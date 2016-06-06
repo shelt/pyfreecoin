@@ -189,21 +189,24 @@ class Peer:
         
         try:
             while True:
-                data = self.sock.recv(MAX_MSG_SIZE)
-                if data == b"":
+                header = self.sock.recv(SIZE_HEADER)
+                if header == b"":
                     break
-                
-                vers = int.from_bytes(data[4:6], byteorder='big')
+                size = int.from_bytes(header[:4], byteorder='big')
+                vers = int.from_bytes(header[4:6], byteorder='big')
                 if vers != fc._VERSION_:
                     self.send_reject(ERR_BAD_VERSION)
-                    break #TODO return needed?
-
-                ctype = int.from_bytes(data[6:7], byteorder='big')
+                    break
+                ctype = int.from_bytes(header[6:7], byteorder='big')
                 if ctype not in self.receivers:
                     self.send_reject(ERR_BAD_CTYPE)
                     continue
+                
+                data = self.sock.recv(size)
+                if data == b"":
+                    break
                 else:
-                    self.receivers[ctype](data[7:])
+                    self.receivers[ctype](data)
         except socket.error as e:
             fc.logger.error("net: error during recv: " + str(e))
         self.shutdown()
