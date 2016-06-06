@@ -19,7 +19,7 @@ class Block(fc.classes.Serializable):
     
     @staticmethod
     def generate_workblock(addr):
-        latest = fc.chain.get_highest_chained_block()
+        latest = fc.chain.get_highest_block(chained_only=True)
         if latest is None:
             fc.logger.error("Failed to generate workblock do to failure to retrieve highest chained block!")
             return None

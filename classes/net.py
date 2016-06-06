@@ -204,7 +204,7 @@ class Peer:
     
     def recv_gethighest(self, data):
         fc.logger.verbose("net: recieve <gethighest>")
-        highest = fc.chain.get_highest_chained_hash()
+        highest = fc.chain.get_highest_hash(chained_only=True)
         if highest is not None:
             self.send_inv(DTYPE_BLOCK, [highest])
 

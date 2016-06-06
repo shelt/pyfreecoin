@@ -177,18 +177,18 @@ def clean():
         fc.logger.verbose("Removing unreferenced block [%s]" % hexlify(block_hash).decode())
         fc.Block.from_file(block_hash).delete_file()
     
-def get_highest_chained_block():
-    hash = get_highest_chained_hash()
+def get_highest_block(chained_only=False):
+    hash = get_highest_hash(chained_only=chained_only)
     if hash is None:
         return None
     else:
         return fc.Block.from_file(hash)
 
-def get_highest_chained_hash():
+def get_highest_hash(chained_only=False):
     heads = [Head.from_file(fname) for fname in os.listdir(fc.DIR_HEADS)]
     if len(heads) == 0:
         return None
-    return max(heads, key=attrgetter('height')).ref_hash
+    return max([head for head in heads if (not chained_only) or head.chained], key=attrgetter('height')).ref_hash
 
 #todo make method
 def compute_next_target(block):

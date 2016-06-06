@@ -17,7 +17,7 @@ class Miner:
             target_num = fc.chain.target_to_num(workblock.target)
             success = False
             while not success:
-                if fc.chain.get_highest_chained_hash() != workblock.prev_hash:
+                if fc.chain.get_highest_hash(chained_only=True) != workblock.prev_hash:
                     break
                 for hash,tx in self.network.mempool.items():
                     if tx not in workblock.txs and tx.is_chain_valid_wrt(workblock):
