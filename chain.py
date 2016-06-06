@@ -186,9 +186,11 @@ def get_highest_block(chained_only=False):
 
 def get_highest_hash(chained_only=False):
     heads = [Head.from_file(fname) for fname in os.listdir(fc.DIR_HEADS)]
+    if chained_only:
+        heads = [head for head in heads if head.chained]
     if len(heads) == 0:
         return None
-    return max([head for head in heads if (not chained_only) or head.chained], key=attrgetter('height')).ref_hash
+    return max(heads, key=attrgetter('height')).ref_hash
 
 #todo make method
 def compute_next_target(block):
