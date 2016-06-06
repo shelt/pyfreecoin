@@ -168,7 +168,10 @@ def clean():
         blocklist.remove(head.ref_hash)
         curr = fc.Block.from_file(head.ref_hash)
         while curr is not None and curr.height != 0:
-            blocklist.remove(curr.prev_hash)
+            try:
+                blocklist.remove(curr.prev_hash)
+            except ValueError:
+                pass
             curr = fc.Block.from_file(curr.prev_hash)
     for block_hash in blocklist:
         fc.logger.verbose("Removing unreferenced block [%s]" % hexlify(block_hash).decode())
