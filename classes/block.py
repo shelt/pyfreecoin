@@ -112,14 +112,14 @@ class Block(fc.classes.Serializable):
         return fc.MINING_REWARD + sum(tx.compute_surplus() for tx in self.txs)
     
     def is_pseudo_valid(self):
-        if int.from_bytes(self.compute_hash(), byteorder='big') > target_num:
+        if int.from_bytes(self.compute_hash(), byteorder='big') > fc.chain.target_to_num(self.target):
             return False
-        if self.version != __VERSION__:
+        if self.version != fc.__VERSION__:
             return False
         if self.merkle_root != self._compute_merkle_root():
             return False
         for tx in self.txs:
-            if not tx.is_pseudo_valid:
+            if not tx.is_pseudo_valid():
                 return False
         return True
     
