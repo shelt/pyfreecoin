@@ -217,11 +217,11 @@ class Peer:
         start = data[0:32]
         count = data[32]
         
-        block = tc.Block.from_file(start)
+        block = fc.Block.from_file(start)
         i = 0
         while block is not None and i<count:
             self.send_block(block)
-            block = tc.Block.from_file(block.prev_hash)
+            block = fc.Block.from_file(block.prev_hash)
             i += 1
 
     def recv_gettxs(self, data):
@@ -318,7 +318,7 @@ class Peer:
             self.send_reject(ERR_BLOCK_INVALID, hexlify(hash).decode())
             return
         else:
-            tc.chain.enchain(block)
+            fc.chain.enchain(block)
 
     def recv_tx(self, data):
         fc.logger.verbose("net: recieve <tx>")
