@@ -45,9 +45,11 @@ class Network():
         ### SERVER PEER CREATION ###
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(5)
             sock.connect((addr,port))
-        except socket.error:
-            fc.logger.error("net: failed to connect to server %s:%d" % (addr,port))
+            sock.settimeout(None)
+        except socket.error as e:
+            fc.logger.error("net: failed to connect to server %s:%d" % (addr,port,e))
             return None
         peer = Peer(self, sock, addr, port, is_server=True)
         thread = threading.Thread(target=peer.handle)
