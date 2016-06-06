@@ -15,7 +15,6 @@ class Block(fc.classes.Serializable):
         self.merkle_root = None
         self.target      = None
         self.nonce       = None
-        self.tx_count    = None
         self.txs         = None
     
     @staticmethod
@@ -32,7 +31,6 @@ class Block(fc.classes.Serializable):
         block.prev_hash   = latest.compute_hash()
         block.target      = fc.chain.compute_next_target(latest)
         block.nonce       = 0
-        block.tx_count    = 1
         block.txs         = [fc.Tx().generate_coinbase(addr)]
         block.recompute_merkle_root()
         return block
@@ -77,14 +75,15 @@ class Block(fc.classes.Serializable):
         block.merkle_root = bytes[42:74]
         block.target      = bytes[74:78]
         block.nonce       = int.from_bytes(bytes[78:82], byteorder='big')
-        block.tx_count    = int.from_bytes(bytes[82:86], byteorder='big')
+        tx_count = int.from_bytes(bytes[82:86], byteorder='big')
         
         block.txs = []
         i = 86
-        for _k in range(block.tx_count):
+        for _k in range(tx_count):
             tx = fc.Tx.from_bytes(bytes[i:])
             block.txs.append(tx)
             i += tx.compute_raw_size()
+        
         return block
     
     def to_bytes(self):
@@ -99,7 +98,7 @@ class Block(fc.classes.Serializable):
         bytes += self.merkle_root
         bytes += self.target
         bytes += self.nonce.to_bytes(4, byteorder='big')
-        bytes += self.tx_count.to_bytes(4, byteorder='big')
+        bytes += len(self.txs).to_bytes(4, byteorder='big')
         
         for tx in self.txs:
             bytes += tx.to_bytes()
