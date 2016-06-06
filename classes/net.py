@@ -203,10 +203,7 @@ class Peer:
                     continue
                 
                 data = self.sock.recv(size)
-                if data == b"":
-                    break
-                else:
-                    self.receivers[ctype](data)
+                self.receivers[ctype](data)
         except socket.error as e:
             fc.logger.error("net: error during recv: " + str(e))
         self.shutdown()
