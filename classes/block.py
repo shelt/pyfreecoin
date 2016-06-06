@@ -112,7 +112,16 @@ class Block(fc.classes.Serializable):
         return fc.MINING_REWARD + sum(tx.compute_surplus() for tx in self.txs)
     
     def is_pseudo_valid(self):
-        raise NotImplementedError
+        if int.from_bytes(self.compute_hash(), byteorder='big') > target_num:
+            return False
+        if self.version != __VERSION__:
+            return False
+        if self.merkle_root != self._compute_merkle_root():
+            return False
+        for tx in self.txs:
+            if not tx.is_pseudo_valid:
+                return False
+        return True
     
     def is_chain_valid(self):
         if self.height == 0:
@@ -136,10 +145,14 @@ class Block(fc.classes.Serializable):
             if not tx.is_chain_valid_wrt(self):
                 return False
         return True
-        
-    def recompute_merkle_root(self):
+
+    def compute_merkle_root(self):
         leaves = [sha256(tx.to_bytes()).digest() for tx in self.txs]
         while len(leaves) > 2:
             branch = fc.util.divide(leaves, 2)
             leaves = [sha256(b"".join(limb)).digest() for limb in branch]
-        self.merkle_root = sha256(b"".join(leaves)).digest()
+        return sha256(b"".join(leaves)).digest()
+
+        
+    def recompute_merkle_root(self):
+        self.merkle_root = self.compute_merkle_root()

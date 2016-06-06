@@ -130,7 +130,7 @@ It's important to test the validity of data we receive. Although there are certa
 * sha256(block_header) <= `target` field
 * `version` field matches that of the current client
 * `merkle_root` must be merkle root of transactions in body, in order
-* The body must contain `tx_count` transactions, all of which must be **pseudo-valid**, with the exception of the first one which can also be  **coinbase-valid**.
+* The body must contain `tx_count` transactions, all of which must be **pseudo-valid**.
 
 #### Block validation (chain)
 * if `height` == 0:
