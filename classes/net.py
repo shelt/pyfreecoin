@@ -63,7 +63,7 @@ class Network():
         # Try to stay stable
         if len(self.peers) < 8:
             for peer in self.peers:
-                peer.send_peers()
+                peer.send_getpeers()
         
         thread = threading.Timer(120, self.peer_custodian)
         thread.daemon = True
@@ -78,8 +78,10 @@ class Network():
             sock.settimeout(None)
         except socket.error as e:
             fc.logger.error("net: failed to connect to server %s:%d [%s]" % (addr,port,e))
+            Peer.delete_file_static((addr,port))
             return None
         peer = Peer(self, sock, addr, port, is_server=True)
+        peer.to_file()
         thread = threading.Thread(target=peer.handle)
         thread.daemon = True
         thread.start()
@@ -159,7 +161,6 @@ class Peer:
     @staticmethod
     def delete_file_static(addr,port):
         entry = addr + ":" + str(port)
-        if entry=='localhost:64720': return # TESTING [TODO]
         with open(fc.FILE_KNOWNPEERS,'r+') as f:
             lines = [s.strip() for s in f.read().split("\n")]
             if entry in lines:
@@ -369,10 +370,6 @@ class Peer:
             return
         if not self.network.is_stable():
             peer = self.network.connect(*peer_t)
-            if peer is not None:
-                peer.to_file()
-            else:
-                Peer.delete_file_static(*peer_t) # Just in case
 
     def recv_alert(self, data):
         fc.logger.error("net: recieve <peer> [doing nothing, please implement functionality]")
