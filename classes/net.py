@@ -80,7 +80,7 @@ class Network():
             sock.settimeout(None)
         except socket.error as e:
             fc.logger.error("net: failed to connect to server %s:%d [%s]" % (addr,port,e))
-            Peer.delete_file_static((addr,port))
+            Peer.delete_file_static(addr,port)
             return None
         peer = Peer(self, sock, addr, port, is_server=True)
         peer.to_file()
@@ -148,13 +148,14 @@ class Peer:
     @staticmethod
     def to_file_static(addr,port):
         with open(fc.FILE_KNOWNPEERS,'r+') as f:
-            entry = addr + ":" + str(port)
-            known = [tuple(s.strip().split(":")) for s in f.read().split("\n")]
+            entry = (addr, str(port))
+            known = [tuple(s.strip().split(":")) for s in f.read().split("\n") if ":" in s]
             if not entry in known:
                 known.append(entry)
                 f.seek(0)
                 for peer_t in known:
-                    f.write(peer_t[0] + ":" + str(peer_t) + "\n")
+                    if len(peer_t) == 2:
+                        f.write(peer_t[0] + ":" + peer_t[1] + "\n")
                 f.truncate()
     
     def delete_file(self):
