@@ -26,10 +26,6 @@ class Network():
         self.thread.daemon = True
         self.thread.start()
         
-        # Custodians
-        self.chain_custodian()
-        self.peer_custodian()
-        
         # Initial peer
         if len(self.peers) == 0:
             known = Peer.from_file_list()
@@ -37,6 +33,10 @@ class Network():
                 peer = self.connect(*peer_t)
                 if peer is None:
                     Peer.delete_file_static(*peer_t)
+        
+        # Custodians
+        self.chain_custodian()
+        self.peer_custodian()
 
     def shutdown(self):
         for peer in self.peers:
@@ -64,6 +64,8 @@ class Network():
         if len(self.peers) < 8:
             for peer in self.peers:
                 peer.send_getpeers()
+        if len(self.peers) == 0:
+            fc.logger.warn("Not connected to any peers!")
         
         thread = threading.Timer(120, self.peer_custodian)
         thread.daemon = True
