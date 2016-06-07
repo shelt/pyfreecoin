@@ -63,7 +63,7 @@ class Network():
         # Try to stay stable
         if len(self.peers) < 8:
             for peer in self.peers:
-                peer.send_getdata(DTYPE_PEER, [])
+                peer.send_peers()
         
         thread = threading.Timer(120, self.peer_custodian)
         thread.daemon = True
@@ -118,14 +118,15 @@ class Peer:
             1:self.recv_gethighest,
             2:self.recv_getchain,
             3:self.recv_gettxs,
-            4:self.recv_inv,
-            5:self.recv_getdata,
-            6:self.recv_block,
-            7:self.recv_tx,
-            8:self.recv_peer,
-            9:self.recv_alert,
-            10:self.recv_ping,
-            11:self.recv_pong
+            4:self.recv_getpeers,
+            5:self.recv_inv,
+            6:self.recv_getdata,
+            7:self.recv_block,
+            8:self.recv_tx,
+            9:self.recv_peer,
+            10:self.recv_alert,
+            11:self.recv_ping,
+            12:self.recv_pong
         }
 
     def shutdown(self):
@@ -197,7 +198,7 @@ class Peer:
         fc.logger.verbose("net: New peer: %s:%d" % (self.addr,self.port))
         self.send_ping()                      # Version exchange
         if not self.network.is_stable:
-            self.send_getdata(DTYPE_PEER, []) # Peer exchange
+            self.send_getpeers()              # Peer exchange
         self.send_gethighest()                # Block exchange
         
         try:
@@ -255,7 +256,12 @@ class Peer:
     def recv_gettxs(self, data):
         fc.logger.verbose("net: recieve <gettxs>")
         self.send_inv(DTYPE_TX, [tx.compute_hash() for tx in self.network.mempool.keys()])
-
+    
+    def recv_getpeers(self, data):
+        for peer in self.network.peers:
+            if peer.is_server and peer is not self:
+                self.send_peer(peer)
+    
     def recv_inv(self, data):
         fc.logger.verbose("net: recieve <inv>")
         if len(data) < 34:
@@ -297,11 +303,6 @@ class Peer:
         fc.logger.verbose("net: recieve <getdata>")
         if len(data) == 0:
             self.send_reject(ERR_MESSAGE_MALFORMED, info="getdata without dtype")
-            return
-        elif data[0] == DTYPE_PEER:
-            for peer in self.network.peers:
-                if peer.is_server and peer is not self:
-                    self.send_peer(peer)
             return
         elif len(data) < 34:
             self.send_reject(ERR_MESSAGE_MALFORMED, info="getdata impossibly short")
@@ -398,6 +399,9 @@ class Peer:
 
     def send_gettxs(self):
         self.send(CTYPE_GETTXS, b"")
+    
+    def send_getpeers(self):
+        self.send(CTYPE_GETPEERS, b"")
 
     def send_inv(self, dtype, ids):
         self.send(CTYPE_INV, dtype.to_bytes(1, byteorder='big') + len(ids).to_bytes(1, byteorder='big') + b"".join([id.encode("ascii") if type(id) is str else id for id in ids]))

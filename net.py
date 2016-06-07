@@ -12,18 +12,18 @@ CTYPE_REJECT     = 0
 CTYPE_GETHIGHEST = 1
 CTYPE_GETCHAIN   = 2
 CTYPE_GETTXS     = 3
-CTYPE_INV        = 4
-CTYPE_GETDATA    = 5
-CTYPE_BLOCK      = 6
-CTYPE_TX         = 7
-CTYPE_PEER       = 8
-CTYPE_ALERT      = 9
-CTYPE_PING       = 10
-CTYPE_PONG       = 11
+CTYPE_GETPEERS   = 4
+CTYPE_INV        = 5
+CTYPE_GETDATA    = 6
+CTYPE_BLOCK      = 7
+CTYPE_TX         = 8
+CTYPE_PEER       = 9
+CTYPE_ALERT      = 10
+CTYPE_PING       = 11
+CTYPE_PONG       = 12
 
 DTYPE_BLOCK = 0
 DTYPE_TX    = 1
-DTYPE_PEER  = 2
 
 OTYPE_WARNUSER    = 0 # Display a warning to the user, visible at all times.
 OTYPE_FORCEUPDATE = 1 # Do not allow user to do anything until the client is updated.
