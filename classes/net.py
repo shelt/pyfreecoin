@@ -143,7 +143,7 @@ class Peer:
             self.network.peers.remove(self)
             
     def to_file(self):
-        to_file_static(self.addr,self.port)
+        self.to_file_static(self.addr,self.port)
     
     @staticmethod
     def to_file_static(addr,port):
