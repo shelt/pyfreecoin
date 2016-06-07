@@ -28,7 +28,10 @@ class Head(fc.classes.Serializable):
             f.write(self.to_bytes())
 
     def delete_file(self):
-        os.remove(os.path.join(fc.DIR_HEADS,hexlify(self.ref_hash).decode()))
+        try:
+            os.remove(os.path.join(fc.DIR_HEADS,hexlify(self.ref_hash).decode()))
+        except FileNotFoundError:
+            pass
     
     @staticmethod
     def from_file(hash):
