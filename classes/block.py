@@ -125,10 +125,7 @@ class Block(fc.classes.Serializable):
     
     def is_chain_valid(self):
         if self.height == 0:
-            if self.compute_hash() == fc.admin.ONE_TRUE_ROOT:
-                return True
-            else:
-                return False
+            return self.compute_hash() == fc.admin.ONE_TRUE_ROOT
         elif self.height < 0:
             return False
         else:
