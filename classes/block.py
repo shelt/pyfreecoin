@@ -21,7 +21,7 @@ class Block(fc.classes.Serializable):
     def generate_workblock(addr):
         latest = fc.chain.get_highest_block(chained_only=True)
         if latest is None:
-            fc.logger.error("Failed to generate workblock do to failure to retrieve highest chained block!")
+            fc.logger.error("Failed to generate workblock due to failure to retrieve highest chained block!")
             return None
         
         block = fc.Block()
