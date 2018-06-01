@@ -124,7 +124,7 @@ In order for the network to remain functional, all clients must abide by the fol
 
 ### Validation
 
-It's important to test the validity of data we receive. Although there are certain traits a block or transaction may have that make them blatanly invalid, there are certain types of validity that can't be tested for until we have a complete picture. To remedy this, there are two tiers of validity: **pseudo-valid** and **chain-valid**. Data can be confirmed to be **pseudo-valid** at first glance. However, it's only until we know about the entire chain of a block or the block of a transaction that we may deem data to be **chain-valid**.
+It's important to test the validity of data we receive. Although there are certain traits a block or transaction may have that make them blatantly invalid, there are certain types of validity that can't be tested for until we have a complete picture. To remedy this, there are two tiers of validity: **pseudo-valid** and **chain-valid**. Data can be confirmed to be **pseudo-valid** at first glance. However, it's only until we know about the entire chain of a block or the block of a transaction that we may deem data to be **chain-valid**.
 
 #### Block validation (pseudo)
 * sha256(block_header) <= `target` field
@@ -137,7 +137,7 @@ It's important to test the validity of data we receive. Although there are certa
   * Block hash must be equal to `ONE_TRUE_ROOT`
 * elif `height` > 0:
   * `time` field > `time` field of previous block
-  * `height`height` field == 1 + `height` of previous block
+  * `height` field == 1 + `height` of previous block
   * If `height` < `CHAIN_RECALC_INTERVAL`:
     * `target` must be equal to the previous block's `target`
   * else:
